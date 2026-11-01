@@ -3,7 +3,7 @@
 // - Lưu thông số vào /data/tuning.json rồi build lại bản web vào /out (Nginx phục vụ)
 // Không dùng thư viện ngoài.
 import { createServer } from 'node:http'
-import { cpSync, existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { extname, join, normalize, relative, sep } from 'node:path'
@@ -93,8 +93,13 @@ function listFiles(dir, base = dir) {
 /** Chép bản build sang thư mục Nginx: file mới trước, index.html sau cùng, rồi dọn file cũ */
 function publish() {
   const files = listFiles(BUILD_DIR)
-  for (const f of files) if (f !== 'index.html') cpSync(join(BUILD_DIR, f), join(OUT, f))
-  cpSync(join(BUILD_DIR, 'index.html'), join(OUT, 'index.html'))
+  // Luôn cho Nginx đọc được, dù mã nguồn được clone với quyền chặt
+  const copy = (f) => {
+    cpSync(join(BUILD_DIR, f), join(OUT, f))
+    chmodSync(join(OUT, f), 0o644)
+  }
+  for (const f of files) if (f !== 'index.html') copy(f)
+  copy('index.html')
   const keep = new Set(files)
   if (existsSync(OUT)) for (const f of listFiles(OUT)) if (!keep.has(f)) rmSync(join(OUT, f))
 }
