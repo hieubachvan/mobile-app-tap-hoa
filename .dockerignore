@@ -1,0 +1,8 @@
+node_modules
+dist
+dist-config
+dist-web
+.git
+.env.local
+# Ảnh gốc ở thư mục gốc không cần cho build
+/*.png

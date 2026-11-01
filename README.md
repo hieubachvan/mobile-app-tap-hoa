@@ -53,3 +53,18 @@ Chạy `npm run config` để sửa bằng giao diện (http://localhost:5173/co
 - Trang cấu hình chỉ có khi chạy dev server và chỉ mở được từ chính máy đó. Điện thoại cùng wifi bị chặn (403).
 - Trang không có trong bản build, nên người chơi không bao giờ thấy.
 - Người chơi chỉ nhận thông số mới khi build lại và phát hành bản mới.
+
+## Deploy lên VPS
+
+Bản web chạy ở VPS bằng Docker, trong thư mục `/opt/tap-hoa`:
+
+- `tap-hoa-web` (Nginx, cổng 8080): phục vụ game và chuyển `/config/` sang container cấu hình.
+- `tap-hoa-config` (`server/config-server.mjs`): trang cấu hình có mật khẩu. Bấm Lưu thì ghi `/opt/tap-hoa/data/tuning.json` và build lại bản web ngay.
+
+Deploy lại sau khi push code lên GitHub:
+
+```bash
+ssh root@<ip-vps> sh /opt/tap-hoa/app/deploy/deploy.sh
+```
+
+Thông số đã chỉnh trên VPS nằm ở `/opt/tap-hoa/data`, nên deploy lại không bị mất. Mật khẩu trang cấu hình chỉ lưu dạng băm trong `/opt/tap-hoa/config.env` (`CONFIG_PASS_HASH=scrypt$<salt>$<hash>`). App Android không đổi theo trang cấu hình trên VPS: bấm **Tải JSON**, chép vào `src/game/tuning.json` rồi build app.

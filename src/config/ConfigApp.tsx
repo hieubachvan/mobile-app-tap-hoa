@@ -1,10 +1,15 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { Tuning } from '../game/tuning'
 import type { Kind, Tier } from '../game/levels'
 import type { QuestKind } from '../game/daily'
 
-// Trang cấu hình chỉ đọc/ghi tuning.json qua /__tuning (không import file JSON)
+// Trang cấu hình chỉ đọc/ghi tuning.json qua API (không import file JSON)
 // để bấm Lưu không làm chính trang này tải lại.
+// - Lúc dev (npm run config): API của Vite, chỉ mở từ localhost, không cần mật khẩu
+// - Trên VPS: server/config-server.mjs, cần đăng nhập; lưu xong tự build lại bản web
+
+const DEV = import.meta.env.DEV
+const API = DEV ? '/__tuning' : '/config/api/tuning'
 
 type Path = (string | number)[]
 
@@ -210,6 +215,45 @@ function TierCard({ tier, set }: { tier: Tier; set: (path: Path, v: unknown) => 
   )
 }
 
+// ---------- Đăng nhập (chỉ trên VPS) ----------
+
+function Login({ onDone }: { onDone: () => void }) {
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    const res = await fetch('/config/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    }).catch(() => null)
+    setBusy(false)
+    if (res?.ok) return onDone()
+    const body = await res?.json().catch(() => null)
+    if (res?.status === 429) setError(`Sai quá nhiều lần. Thử lại sau ${body?.minutes ?? 15} phút.`)
+    else if (res?.status === 401) setError(body?.left ? `Sai mật khẩu. Còn ${body.left} lần thử.` : 'Sai mật khẩu. Tạm khóa 15 phút.')
+    else setError('Không kết nối được máy chủ.')
+  }
+
+  return (
+    <form className="login" onSubmit={submit}>
+      <h1>⚙️ Cấu hình game</h1>
+      <label className="field">
+        <span className="label">Mật khẩu</span>
+        <input type="password" autoFocus autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+      </label>
+      {error && <p className="status bad">{error}</p>}
+      <button className="primary" disabled={busy || !password}>
+        {busy ? 'Đang kiểm tra…' : 'Vào trang cấu hình'}
+      </button>
+    </form>
+  )
+}
+
 // ---------- Trang ----------
 
 export default function ConfigApp() {
@@ -217,9 +261,15 @@ export default function ConfigApp() {
   const [saved, setSaved] = useState('')
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
   const [allQuestions, setAllQuestions] = useState(10)
+  const [needLogin, setNeedLogin] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const load = async () => {
-    const res = await fetch('/__tuning')
+    const res = await fetch(API)
+    if (res.status === 401) {
+      setNeedLogin(true)
+      return
+    }
     const data = (await res.json()) as Tuning
     setT(data)
     setSaved(JSON.stringify(data))
@@ -240,6 +290,18 @@ export default function ConfigApp() {
     return () => window.removeEventListener('beforeunload', warn)
   }, [dirty])
 
+  if (needLogin) {
+    return (
+      <Login
+        onDone={() => {
+          setNeedLogin(false)
+          // Hết phiên giữa chừng: giữ nguyên chỗ đang sửa, không tải lại
+          if (!t) load().catch((e) => setStatus({ ok: false, text: `Không đọc được cấu hình: ${e}` }))
+        }}
+      />
+    )
+  }
+
   if (!t) return <div className="page">{status?.text ?? 'Đang tải…'}</div>
 
   const set = (path: Path) => (v: unknown) => setT((cur) => (cur ? setIn(cur, path, v) : cur))
@@ -250,17 +312,50 @@ export default function ConfigApp() {
       setStatus({ ok: false, text: errs.join('\n') })
       return
     }
-    const res = await fetch('/__tuning', {
+    setSaving(true)
+    setStatus({ ok: true, text: DEV ? 'Đang lưu…' : 'Đang lưu và build lại bản web, chờ chút…' })
+    const res = await fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Tuning': '1' },
       body: JSON.stringify(t),
-    })
-    if (!res.ok) {
-      setStatus({ ok: false, text: `Lưu thất bại: ${await res.text()}` })
+    }).catch(() => null)
+    setSaving(false)
+    if (res?.status === 401) {
+      setStatus(null)
+      setNeedLogin(true)
+      return
+    }
+    if (!res?.ok) {
+      const body = await res?.text().catch(() => '')
+      let msg = body
+      try {
+        msg = JSON.parse(body ?? '').error ?? body
+      } catch {
+        /* lỗi dạng chữ */
+      }
+      setStatus({ ok: false, text: `Lưu thất bại: ${msg || 'không kết nối được máy chủ'}` })
       return
     }
     setSaved(JSON.stringify(t))
-    setStatus({ ok: true, text: 'Đã lưu vào src/game/tuning.json. Tab game đang mở sẽ tự tải lại.' })
+    if (DEV) setStatus({ ok: true, text: 'Đã lưu vào src/game/tuning.json. Tab game đang mở sẽ tự tải lại.' })
+    else {
+      const { seconds } = (await res.json()) as { seconds: number }
+      setStatus({ ok: true, text: `Đã lưu và cập nhật bản web (build ${Math.round(seconds)} giây). Người chơi mở lại game là nhận thông số mới.` })
+    }
+  }
+
+  const download = () => {
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(t, null, 2) + '\n'], { type: 'application/json' }))
+    a.download = 'tuning.json'
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
+  const logout = async () => {
+    await fetch('/config/api/logout', { method: 'POST' }).catch(() => null)
+    setT(null)
+    setNeedLogin(true)
   }
 
   return (
@@ -278,21 +373,33 @@ export default function ConfigApp() {
         </nav>
         <div className="actions">
           <span className={dirty ? 'dirty' : 'clean'}>{dirty ? 'Có thay đổi chưa lưu' : 'Đã lưu'}</span>
-          <button onClick={() => load()} disabled={!dirty}>
+          <button onClick={() => load()} disabled={!dirty || saving}>
             Hoàn tác
           </button>
-          <button className="primary" onClick={save} disabled={!dirty}>
-            Lưu
+          <button className="primary" onClick={save} disabled={!dirty || saving}>
+            {saving ? 'Đang lưu…' : 'Lưu'}
           </button>
+          <button onClick={download} title="Tải file tuning.json để chép vào repo khi build app Android">
+            Tải JSON
+          </button>
+          {!DEV && <button onClick={logout}>Đăng xuất</button>}
         </div>
       </header>
 
       {status && <pre className={`status ${status.ok ? 'ok' : 'bad'}`}>{status.text}</pre>}
 
-      <p className="note">
-        Thay đổi được ghi vào <code>src/game/tuning.json</code>. Để người chơi nhận được, cần build lại app và phát hành
-        bản mới. Tiến độ đã lưu của bé (xu, ngày, đồ đã mua) không bị ảnh hưởng.
-      </p>
+      {DEV ? (
+        <p className="note">
+          Thay đổi được ghi vào <code>src/game/tuning.json</code>. Để người chơi nhận được, cần build lại app và phát hành
+          bản mới. Tiến độ đã lưu của bé (xu, ngày, đồ đã mua) không bị ảnh hưởng.
+        </p>
+      ) : (
+        <p className="note">
+          Lưu ở đây sẽ cập nhật ngay <b>bản web</b> trên máy chủ. App Android đóng gói sẵn thông số nên không đổi theo: bấm{' '}
+          <b>Tải JSON</b>, chép vào <code>src/game/tuning.json</code> trong repo rồi build app. Tiến độ của bé không bị ảnh
+          hưởng.
+        </p>
+      )}
 
       <Section id="day" title="Ngày bán hàng" desc="Áp dụng cho mọi cấp. Số câu mỗi ngày đặt riêng từng cấp ở phần Cấp độ.">
         <div className="grid">

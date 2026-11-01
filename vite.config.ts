@@ -58,6 +58,13 @@ function tuningPage(): Plugin {
   }
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), tuningPage()],
-})
+  // `npm run build:config`: chỉ build trang cấu hình cho máy chủ trên VPS (server/config-server.mjs)
+  ...(mode === 'config' && {
+    base: '/config/',
+    // Ảnh game do Nginx phục vụ ở /img/, không chép vào bản build trang cấu hình
+    publicDir: false,
+    build: { outDir: 'dist-config', rollupOptions: { input: 'config.html' } },
+  }),
+}))

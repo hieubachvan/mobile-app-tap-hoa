@@ -250,3 +250,24 @@ td input {
 .inline input {
   width: 70px;
 }
+
+.login {
+  max-width: 340px;
+  margin: 12vh auto 0;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.login h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.login .status {
+  margin: 0;
+}

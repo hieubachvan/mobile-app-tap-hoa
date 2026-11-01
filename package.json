@@ -8,6 +8,7 @@
     "dev:test": "vite --host --mode test",
     "config": "vite --open /config.html",
     "build": "tsc --noEmit && vite build",
+    "build:config": "vite build --mode config",
     "preview": "vite preview --host"
   },
   "dependencies": {
