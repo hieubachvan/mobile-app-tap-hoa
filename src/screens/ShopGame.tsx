@@ -24,6 +24,8 @@ interface Props {
   profile: Profile
   /** Luyện riêng một phép tính, không tính vào tiến độ ngày */
   practice: Op | null
+  /** Lượt này có được nhận xu không (Luyện riêng giới hạn lượt thưởng mỗi ngày) */
+  rewarded: boolean
   onFinish: (r: DayResult) => void
   onExit: () => void
   onGoldBonus: () => void
@@ -53,9 +55,10 @@ function starsFor(ratio: number) {
   return 0
 }
 
-export default function ShopGame({ profile, practice, onFinish, onExit, onGoldBonus }: Props) {
+export default function ShopGame({ profile, practice, rewarded: rewardedProp, onFinish, onExit, onGoldBonus }: Props) {
   // Chốt ngày/cấp lúc vào tiệm để kết quả không đổi khi profile cập nhật
   const [day] = useState(profile.day)
+  const [rewarded] = useState(rewardedProp)
   const [tier] = useState(() => {
     const t = tierFor(profile.age, profile.day)
     return practice ? practiceTier(t, practice) : t
@@ -117,7 +120,7 @@ export default function ShopGame({ profile, practice, onFinish, onExit, onGoldBo
 
   const finishDay = (coins: number, ft: number, lostNow: number) => {
     const stars = Math.max(0, Math.min(starsFor(ft / totalSteps), MAX_RATING - lostNow))
-    const r = { stars, coins, passed: stars >= 1, ...tally.current }
+    const r = { stars, coins: rewarded ? coins : 0, passed: stars >= 1, ...tally.current }
     setResult(r)
     onFinish(r)
     sfx.win()
@@ -218,7 +221,13 @@ export default function ShopGame({ profile, practice, onFinish, onExit, onGoldBo
         <p className="result-text">
           Đúng ngay lần đầu: <b>{firstTry}/{totalSteps}</b>
           <br />
-          Tiền lời: <b>🪙 {result.coins} {CURRENCY}</b>
+          {rewarded ? (
+            <>
+              Tiền lời: <b>🪙 {result.coins} {CURRENCY}</b>
+            </>
+          ) : (
+            <>Hết lượt nhận xu hôm nay, mai quay lại nhé!</>
+          )}
           {lost > 0 && (
             <>
               <br />

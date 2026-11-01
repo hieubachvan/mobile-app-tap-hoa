@@ -75,6 +75,9 @@ export default function DevPanel({ profile, update }: Props) {
           }),
         )}
         {btn('Nhiệm vụ mới', () => update({ daily: newDaily(today()) }))}
+        {btn('Reset lượt thưởng', () =>
+          update((p) => ({ daily: { ...(p.daily?.date === today() ? p.daily : newDaily(today())), rewardRuns: {} } })),
+        )}
       </div>
     </div>
   )

@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import { OPS, type Op } from '../game/levels'
 import { sfx } from '../game/sound'
+import { REWARD_RUNS_PER_DAY } from '../game/daily'
 
 interface Props {
+  /** Số lượt Luyện riêng còn được nhận xu hôm nay */
+  rewardLeft: number
   onPlay: (screen: 'shop' | 'gold', op: Op) => void
   onExit: () => void
 }
 
-export default function Practice({ onPlay, onExit }: Props) {
+export default function Practice({ rewardLeft, onPlay, onExit }: Props) {
   const [op, setOp] = useState<Op | null>(null)
 
   return (
@@ -20,6 +23,11 @@ export default function Practice({ onPlay, onExit }: Props) {
       </header>
 
       <p className="practice-tip">Bé muốn luyện phép tính nào? Luyện riêng không ảnh hưởng tiến độ ngày.</p>
+      <p className={`reward-tag center ${rewardLeft > 0 ? '' : 'done'}`}>
+        {rewardLeft > 0
+          ? `🪙 Hôm nay còn ${rewardLeft}/${REWARD_RUNS_PER_DAY} lượt nhận xu`
+          : 'Hôm nay đã hết lượt nhận xu. Bé vẫn luyện được, mai quay lại nhận thưởng nhé!'}
+      </p>
 
       <div className="op-grid">
         {OPS.map((o) => (

@@ -747,6 +747,32 @@ button {
   font-size: 18px;
 }
 
+.reward-tag {
+  font-size: 12px;
+  font-weight: 700;
+  color: #8a5a00;
+  background: #fff3c4;
+  border-radius: 999px;
+  padding: 0 8px;
+  margin: 2px 0;
+}
+
+.reward-tag.done {
+  color: var(--muted);
+  background: #f1e7d8;
+}
+
+.reward-tag.center {
+  align-self: center;
+  font-size: 14px;
+  padding: 2px 12px;
+  text-align: center;
+}
+
+.chip.muted {
+  opacity: 0.6;
+}
+
 .game-best {
   font-size: 13px;
   color: var(--muted);

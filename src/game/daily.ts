@@ -3,6 +3,11 @@ export const CHECKIN_REWARDS = [10, 15, 20, 25, 30, 40, 80]
 
 export const CHEST_REWARD = 30
 
+/** Mỗi ngày chỉ bấy nhiêu lượt Đào vàng / Luyện riêng được nhận xu; chơi thêm vẫn được nhưng không có xu */
+export const REWARD_RUNS_PER_DAY = 3
+
+export type RewardGame = 'gold' | 'practice'
+
 export type QuestKind = 'serve' | 'perfect' | 'gold' | 'practice' | 'stars'
 
 export interface Quest {
@@ -17,6 +22,8 @@ export interface DailyState {
   date: string
   quests: Quest[]
   chestClaimed: boolean
+  /** Số lượt đã nhận xu hôm nay; hồ sơ cũ có thể chưa có */
+  rewardRuns?: Partial<Record<RewardGame, number>>
 }
 
 const POOL: Omit<Quest, 'progress' | 'claimed'>[] = [
@@ -67,7 +74,18 @@ export function newDaily(date: string): DailyState {
     const [q] = pool.splice(Math.floor(rnd() * pool.length), 1)
     quests.push({ ...q, progress: 0, claimed: false })
   }
-  return { date, quests, chestClaimed: false }
+  return { date, quests, chestClaimed: false, rewardRuns: {} }
+}
+
+export function rewardRunsLeft(d: DailyState | undefined, game: RewardGame) {
+  return Math.max(0, REWARD_RUNS_PER_DAY - (ensureDaily(d).rewardRuns?.[game] ?? 0))
+}
+
+/** Ghi nhận đã dùng một lượt có thưởng */
+export function spendRewardRun(d: DailyState | undefined, game: RewardGame): DailyState {
+  const cur = ensureDaily(d)
+  const runs = cur.rewardRuns ?? {}
+  return { ...cur, rewardRuns: { ...runs, [game]: (runs[game] ?? 0) + 1 } }
 }
 
 export function ensureDaily(d: DailyState | undefined): DailyState {

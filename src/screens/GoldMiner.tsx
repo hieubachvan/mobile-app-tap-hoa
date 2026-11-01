@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { callName, type Profile } from '../game/storage'
+import { REWARD_RUNS_PER_DAY } from '../game/daily'
 import { OPS, tierFor, type Op } from '../game/levels'
 import { exprToSpeech, genDrill, type Drill } from '../game/questions'
 import { distractors, rand, shuffle } from '../game/random'
@@ -9,6 +10,8 @@ interface Props {
   profile: Profile
   /** Luyện riêng một phép tính */
   practice: Op | null
+  /** Số lượt còn được nhận xu hôm nay */
+  rewardLeft: number
   onFinish: (correct: number, coins: number) => void
   onExit: () => void
 }
@@ -53,6 +56,8 @@ interface GameState {
   tries: number
   timeLeft: number
   over: boolean
+  /** Lượt này có được nhận xu không (chốt lúc bắt đầu lượt) */
+  rewarded: boolean
   pops: Pop[]
 }
 
@@ -90,17 +95,17 @@ function tip(g: GameState) {
   return { x: PIVOT.x + Math.sin(g.angle) * g.len, y: PIVOT.y + Math.cos(g.angle) * g.len }
 }
 
-function newGame(tierId: number, op?: Op): GameState {
+function newGame(tierId: number, rewarded: boolean, op?: Op): GameState {
   const drill = genDrill(tierId, op)
   return {
     phase: 'swing', t: 0, angle: 0, len: ROPE_MIN, caught: null,
-    nuggets: makeField(drill), drill, correct: 0, tries: 0, timeLeft: GAME_TIME, over: false, pops: [],
+    nuggets: makeField(drill), drill, correct: 0, tries: 0, timeLeft: GAME_TIME, over: false, rewarded, pops: [],
   }
 }
 
-export default function GoldMiner({ profile, practice, onFinish, onExit }: Props) {
+export default function GoldMiner({ profile, practice, rewardLeft, onFinish, onExit }: Props) {
   const [tierId] = useState(() => tierFor(profile.age, profile.day).id)
-  const g = useRef<GameState>(newGame(tierId, practice ?? undefined))
+  const g = useRef<GameState>(newGame(tierId, rewardLeft > 0, practice ?? undefined))
   const [, setFrame] = useState(0)
   const [round, setRound] = useState(0)
   const finishRef = useRef(onFinish)
@@ -198,7 +203,7 @@ export default function GoldMiner({ profile, practice, onFinish, onExit }: Props
   }
 
   const restart = () => {
-    g.current = newGame(tierId, practice ?? undefined)
+    g.current = newGame(tierId, rewardLeft > 0, practice ?? undefined)
     setRound((r) => r + 1)
   }
 
@@ -215,6 +220,9 @@ export default function GoldMiner({ profile, practice, onFinish, onExit }: Props
         <div className="chip">⏱️ {Math.ceil(s.timeLeft)}s</div>
         <div className="chip">✅ {s.correct}</div>
         <div className="chip">🏆 {Math.max(profile.goldBest, s.correct)}</div>
+        <div className={`chip ${s.rewarded ? '' : 'muted'}`} title="Lượt nhận xu hôm nay">
+          🪙 {s.rewarded ? `${rewardLeft}/${REWARD_RUNS_PER_DAY}` : 'hết'}
+        </div>
       </header>
 
       <button className="drill" onClick={() => speak(exprToSpeech(s.drill.expr))}>
@@ -297,7 +305,13 @@ export default function GoldMiner({ profile, practice, onFinish, onExit }: Props
             <p className="result-text">
               Gắp đúng <b>{s.correct}</b> / {s.tries} lần
               <br />
-              Thưởng: <b>🪙 {s.correct * COINS_PER_CORRECT} xu</b>
+              {s.rewarded ? (
+                <>
+                  Thưởng: <b>🪙 {s.correct * COINS_PER_CORRECT} xu</b>
+                </>
+              ) : (
+                <>Hết lượt nhận xu hôm nay, mai quay lại nhé! Kỷ lục vẫn được tính.</>
+              )}
             </p>
             <button className="btn btn-gold btn-xl" onClick={restart}>
               🔁 Chơi lại

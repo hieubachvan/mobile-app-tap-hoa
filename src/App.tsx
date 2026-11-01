@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react'
 import { loadProfile, newProfile, saveProfile, type Profile } from './game/storage'
 import { setSoundEnabled } from './game/sound'
-import { CHECKIN_REWARDS, CHEST_REWARD, addProgress, ensureDaily, today, yesterday } from './game/daily'
+import {
+  CHECKIN_REWARDS,
+  CHEST_REWARD,
+  addProgress,
+  ensureDaily,
+  rewardRunsLeft,
+  spendRewardRun,
+  today,
+  yesterday,
+} from './game/daily'
 import type { Upgrade } from './game/upgrades'
 import type { ShopLevel } from './game/shopLevels'
 import Welcome from './screens/Welcome'
@@ -58,18 +67,27 @@ export default function App() {
   /** Đang luyện riêng thì quay về màn chọn phép tính, không thì về tiệm */
   const exitGame = () => play(practice ? 'practice' : 'home')
 
+  // Hết lượt thưởng thì vẫn tính nhiệm vụ và kỷ lục, chỉ không cộng xu
   const finishPractice = (r: DayResult) =>
-    update((p) => ({
-      coins: p.coins + r.coins,
-      daily: addProgress(p.daily, { serve: r.served, perfect: r.perfect, practice: 1 }),
-    }))
+    update((p) => {
+      const rewarded = rewardRunsLeft(p.daily, 'practice') > 0
+      const daily = addProgress(p.daily, { serve: r.served, perfect: r.perfect, practice: 1 })
+      return {
+        coins: p.coins + (rewarded ? r.coins : 0),
+        daily: rewarded ? spendRewardRun(daily, 'practice') : daily,
+      }
+    })
 
   const finishGold = (correct: number, coins: number) =>
-    update((p) => ({
-      coins: p.coins + coins,
-      goldBest: Math.max(p.goldBest, correct),
-      daily: addProgress(p.daily, { gold: correct }),
-    }))
+    update((p) => {
+      const rewarded = rewardRunsLeft(p.daily, 'gold') > 0
+      const daily = addProgress(p.daily, { gold: correct })
+      return {
+        coins: p.coins + (rewarded ? coins : 0),
+        goldBest: Math.max(p.goldBest, correct),
+        daily: rewarded ? spendRewardRun(daily, 'gold') : daily,
+      }
+    })
 
   const buyUpgrade = (u: Upgrade) =>
     update((p) => (p.coins >= u.cost && !p.owned.includes(u.id) ? { coins: p.coins - u.cost, owned: [...p.owned, u.id] } : {}))
@@ -122,15 +140,24 @@ export default function App() {
         <ShopGame
           profile={profile}
           practice={practice}
+          rewarded={!practice || rewardRunsLeft(profile.daily, 'practice') > 0}
           onFinish={practice ? finishPractice : finishDay}
           onExit={exitGame}
           onGoldBonus={() => play('gold', practice)}
         />
       )}
       {screen === 'gold' && (
-        <GoldMiner profile={profile} practice={practice} onFinish={finishGold} onExit={exitGame} />
+        <GoldMiner
+          profile={profile}
+          practice={practice}
+          rewardLeft={rewardRunsLeft(profile.daily, 'gold')}
+          onFinish={finishGold}
+          onExit={exitGame}
+        />
       )}
-      {screen === 'practice' && <Practice onPlay={play} onExit={() => play('home')} />}
+      {screen === 'practice' && (
+        <Practice rewardLeft={rewardRunsLeft(profile.daily, 'practice')} onPlay={play} onExit={() => play('home')} />
+      )}
       {screen === 'upgrades' && <Upgrades profile={profile} onBuy={buyUpgrade} onLevelUp={levelUp} onExit={() => play('home')} />}
       {screen === 'quests' && (
         <Quests profile={profile} onClaimQuest={claimQuest} onClaimChest={claimChest} onExit={() => play('home')} />

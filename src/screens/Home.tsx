@@ -1,7 +1,7 @@
 import type { Profile } from '../game/storage'
 import { DAYS_PER_TIER, TIERS, tierFor } from '../game/levels'
 import { sfx } from '../game/sound'
-import { claimable, ensureDaily } from '../game/daily'
+import { REWARD_RUNS_PER_DAY, claimable, ensureDaily, rewardRunsLeft } from '../game/daily'
 import { nextShopLevel, shopLevel } from '../game/shopLevels'
 import ShopDecor from '../components/ShopDecor'
 import ShopSign from '../components/ShopSign'
@@ -17,6 +17,16 @@ const COMING_SOON = [
   { emoji: '🎣', name: 'Câu cá số' },
   { emoji: '🧺', name: 'Hứng trái cây' },
 ]
+
+function RewardTag({ left }: { left: number }) {
+  return left > 0 ? (
+    <span className="reward-tag">
+      🪙 Còn {left}/{REWARD_RUNS_PER_DAY} lượt thưởng
+    </span>
+  ) : (
+    <span className="reward-tag done">Mai quay lại nhận thưởng nhé!</span>
+  )
+}
 
 export default function Home({ profile, onPlay, onToggleSound, onReset }: Props) {
   const tier = tierFor(profile.age, profile.day)
@@ -96,12 +106,13 @@ export default function Home({ profile, onPlay, onToggleSound, onReset }: Props)
         <button className="game-card gold" onClick={() => play('gold')}>
           <span className="game-emoji">⛏️</span>
           <span className="game-name">Đào vàng</span>
+          <RewardTag left={rewardRunsLeft(profile.daily, 'gold')} />
           {profile.goldBest > 0 && <span className="game-best">Kỷ lục: {profile.goldBest}</span>}
         </button>
         <button className="game-card practice" onClick={() => play('practice')}>
           <span className="game-emoji">🎯</span>
           <span className="game-name">Luyện riêng</span>
-          <span className="game-best">➕ ➖ ✖️ ➗</span>
+          <RewardTag left={rewardRunsLeft(profile.daily, 'practice')} />
         </button>
         {COMING_SOON.map((g) => (
           <div key={g.name} className="game-card locked">
