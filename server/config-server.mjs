@@ -22,9 +22,10 @@ const LOCK_MS = 15 * 60 * 1000
 
 // ---------- Mật khẩu ----------
 
-const [algo, saltHex, hashHex] = (process.env.CONFIG_PASS_HASH ?? '').split('$')
+// Dùng dấu ":" vì Docker Compose coi "$" trong env_file là biến
+const [algo, saltHex, hashHex] = (process.env.CONFIG_PASS_HASH ?? '').split(':')
 if (algo !== 'scrypt' || !saltHex || !hashHex) {
-  console.error('Thiếu CONFIG_PASS_HASH (dạng scrypt$<salt hex>$<hash hex>)')
+  console.error('Thiếu CONFIG_PASS_HASH (dạng scrypt:<salt hex>:<hash hex>)')
   process.exit(1)
 }
 

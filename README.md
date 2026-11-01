@@ -67,4 +67,4 @@ Deploy lại sau khi push code lên GitHub:
 ssh root@<ip-vps> sh /opt/tap-hoa/app/deploy/deploy.sh
 ```
 
-Thông số đã chỉnh trên VPS nằm ở `/opt/tap-hoa/data`, nên deploy lại không bị mất. Mật khẩu trang cấu hình chỉ lưu dạng băm trong `/opt/tap-hoa/config.env` (`CONFIG_PASS_HASH=scrypt$<salt>$<hash>`). App Android không đổi theo trang cấu hình trên VPS: bấm **Tải JSON**, chép vào `src/game/tuning.json` rồi build app.
+Thông số đã chỉnh trên VPS nằm ở `/opt/tap-hoa/data`, nên deploy lại không bị mất. Mật khẩu trang cấu hình chỉ lưu dạng băm trong `/opt/tap-hoa/config.env` (`CONFIG_PASS_HASH=scrypt:<salt>:<hash>`). App Android không đổi theo trang cấu hình trên VPS: bấm **Tải JSON**, chép vào `src/game/tuning.json` rồi build app.

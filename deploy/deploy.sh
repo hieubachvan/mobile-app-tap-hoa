@@ -18,4 +18,7 @@ fi
 cp app/deploy/docker-compose.yml app/deploy/nginx.conf .
 mkdir -p data dist
 docker compose up -d --build
+# Nginx giữ cấu hình cũ nếu container không bị tạo lại: kiểm tra rồi nạp lại
+docker compose exec -T web nginx -t
+docker compose exec -T web nginx -s reload
 docker compose ps
