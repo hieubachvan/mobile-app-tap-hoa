@@ -45,6 +45,9 @@ export function saveProfile(p: Profile | null) {
   }
 }
 
+/** Tên để gọi bé trong lời thoại: chữ cuối của họ tên, vd "Nguyễn Minh Khôi" → "Khôi" */
+export const callName = (name: string) => name.trim().split(/\s+/).pop() || name
+
 export function newProfile(name: string, age: number): Profile {
   return { name, age, day: 1, coins: 0, stars: {}, goldBest: 0, sound: true, ...DEFAULTS }
 }

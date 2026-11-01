@@ -71,6 +71,22 @@ button {
   white-space: nowrap;
 }
 
+.home .topbar {
+  flex-wrap: nowrap;
+}
+
+/* Tên dài tự co lại, các ô khác giữ nguyên */
+.name-chip {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home .topbar .icon-btn {
+  flex-shrink: 0;
+}
+
 .icon-btn {
   margin-left: auto;
   width: 42px;
@@ -164,7 +180,8 @@ button {
 }
 
 .sign-title {
-  font-size: 34px;
+  font-size: calc(34px * var(--scale, 1));
+  overflow-wrap: anywhere;
   font-weight: 800;
   color: #c0392b;
   line-height: 1.15;
@@ -172,7 +189,7 @@ button {
 }
 
 .sign.big .sign-title {
-  font-size: 46px;
+  font-size: calc(46px * var(--scale, 1));
 }
 
 /* ---------- Màn chào ---------- */

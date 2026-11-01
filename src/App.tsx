@@ -32,6 +32,10 @@ export default function App() {
   }
 
   useEffect(() => {
+    document.title = profile ? `Tiệm Tạp Hóa ${profile.name}` : 'Tiệm Tạp Hóa'
+  }, [profile?.name])
+
+  useEffect(() => {
     saveProfile(profile)
     setSoundEnabled(profile?.sound ?? true)
   }, [profile])

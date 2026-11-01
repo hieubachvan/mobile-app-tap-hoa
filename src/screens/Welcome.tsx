@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { sfx } from '../game/sound'
 import { SHOP_LEVELS } from '../game/shopLevels'
 import ShopDecor from '../components/ShopDecor'
+import ShopSign from '../components/ShopSign'
 
 const AGES = [3, 4, 5, 6, 7, 8, 9, 10]
 
@@ -12,10 +13,7 @@ export default function Welcome({ onStart }: { onStart: (name: string, age: numb
 
   return (
     <div className="app welcome">
-      <div className="sign big">
-        <div className="sign-sub">Tiệm Tạp Hóa</div>
-        <div className="sign-title">Cậu Lớn</div>
-      </div>
+      <ShopSign name={name} big />
       <ShopDecor level={SHOP_LEVELS[0]} owned={[]} />
       <p className="welcome-text">Chào bé! Hôm nay bé làm chủ tiệm, bán hàng và tính tiền cho khách nhé!</p>
 

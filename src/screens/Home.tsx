@@ -4,6 +4,7 @@ import { sfx } from '../game/sound'
 import { claimable, ensureDaily } from '../game/daily'
 import { nextShopLevel, shopLevel } from '../game/shopLevels'
 import ShopDecor from '../components/ShopDecor'
+import ShopSign from '../components/ShopSign'
 
 interface Props {
   profile: Profile
@@ -35,7 +36,7 @@ export default function Home({ profile, onPlay, onToggleSound, onReset }: Props)
   return (
     <div className="home">
       <header className="topbar">
-        <div className="chip">👦 {profile.name}</div>
+        <div className="chip name-chip">👦 {profile.name}</div>
         <div className="chip">🪙 {profile.coins}</div>
         <div className="chip">⭐ {totalStars}</div>
         <button className="icon-btn" onClick={onToggleSound} aria-label="Bật/tắt âm thanh">
@@ -44,10 +45,7 @@ export default function Home({ profile, onPlay, onToggleSound, onReset }: Props)
       </header>
 
       <div className="storefront">
-        <div className="sign">
-          <div className="sign-sub">Tiệm Tạp Hóa</div>
-          <div className="sign-title">Cậu Lớn</div>
-        </div>
+        <ShopSign name={profile.name} />
         <ShopDecor level={level} owned={profile.owned} />
         <div className="level-caption">
           <span className="level-badge">Cấp {level.level}</span> {level.name}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Profile } from '../game/storage'
+import { callName, type Profile } from '../game/storage'
 import { OPS, tierFor, type Op } from '../game/levels'
 import { exprToSpeech, genDrill, type Drill } from '../game/questions'
 import { distractors, rand, shuffle } from '../game/random'
@@ -105,7 +105,7 @@ export default function GoldMiner({ profile, practice, onFinish, onExit }: Props
   const [round, setRound] = useState(0)
   const finishRef = useRef(onFinish)
   finishRef.current = onFinish
-  const nameRef = useRef(profile.name)
+  const nameRef = useRef(callName(profile.name))
 
   useEffect(() => {
     speak(exprToSpeech(g.current.drill.expr))
@@ -257,7 +257,7 @@ export default function GoldMiner({ profile, practice, onFinish, onExit }: Props
           <circle key={i} cx={x} cy={y} r={4} fill="#5a3216" opacity={0.5} />
         ))}
 
-        {/* Cậu Lớn và tời kéo */}
+        {/* Chủ tiệm và tời kéo */}
         <text x={PIVOT.x - 52} y={GROUND - 14} fontSize="42">🧒</text>
         <rect x={PIVOT.x - 18} y={GROUND - 28} width={36} height={20} rx={4} fill="#8a5a2b" stroke="#4d2f12" strokeWidth={2} />
         <circle cx={PIVOT.x} cy={GROUND - 18} r={7} fill="#c99a5c" stroke="#4d2f12" strokeWidth={2} />

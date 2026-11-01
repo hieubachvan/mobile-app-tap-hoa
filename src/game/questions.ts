@@ -4,6 +4,9 @@ import { distractors, pick, rand, shuffle } from './random'
 
 export const CURRENCY = 'xu'
 
+/** Chỗ giữ tên chủ tiệm trong câu thoại; genVisit thay bằng tên bé */
+const OWNER = '{chủ tiệm}'
+
 export interface Line {
   item: Item
   qty: number
@@ -75,8 +78,8 @@ function totalStep(c: Customer, lines: Line[], t: Tier): Step {
   const total = sumOf(lines)
   const d = describe(lines)
   return {
-    prompt: `Cậu Lớn ơi, ${c.title} mua ${d.emoji}. Hết bao nhiêu ${CURRENCY}?`,
-    speech: `Cậu Lớn ơi, ${c.title} mua ${d.speech}. Hết bao nhiêu ${CURRENCY}?`,
+    prompt: `${OWNER} ơi, ${c.title} mua ${d.emoji}. Hết bao nhiêu ${CURRENCY}?`,
+    speech: `${OWNER} ơi, ${c.title} mua ${d.speech}. Hết bao nhiêu ${CURRENCY}?`,
     expr: `${totalExpr(lines, t.useMul)} = ?`,
     answer: total,
     hint: total <= 20 ? { groups: lines.flatMap((l) => Array<number>(l.qty).fill(l.price)) } : undefined,
@@ -92,8 +95,17 @@ function genLines(t: Tier, maxTotal: number, items: Item[]): Line[] {
   return [{ item: pick(items), qty: 1, price: t.price[0] }]
 }
 
-/** `items`: các mặt hàng tiệm đang bán (mở thêm khi nâng cấp tiệm) */
-export function genVisit(t: Tier, items: Item[] = ITEMS): Visit {
+/**
+ * `items`: các mặt hàng tiệm đang bán (mở thêm khi nâng cấp tiệm)
+ * `owner`: tên bé, khách gọi chủ tiệm bằng tên này
+ */
+export function genVisit(t: Tier, items: Item[] = ITEMS, owner = 'Cậu Lớn'): Visit {
+  const v = buildVisit(t, items)
+  const named = (s: string) => s.split(OWNER).join(owner)
+  return { ...v, steps: v.steps.map((s) => ({ ...s, prompt: named(s.prompt), speech: named(s.speech) })) }
+}
+
+function buildVisit(t: Tier, items: Item[]): Visit {
   const customer = pick(CUSTOMERS)
   const c = customer
   const kind = pick(t.kinds)
@@ -108,13 +120,13 @@ export function genVisit(t: Tier, items: Item[] = ITEMS): Visit {
       const total = sumOf(lines)
       const single = types === 1
       const prompt = single
-        ? `Cậu Lớn ơi, ${c.title} lấy mấy ${unitOf(lines[0].item)} ${nounOf(lines[0].item)} vậy?`
-        : `Cậu Lớn ơi, ${c.title} lấy tất cả mấy món vậy?`
+        ? `${OWNER} ơi, ${c.title} lấy mấy ${unitOf(lines[0].item)} ${nounOf(lines[0].item)} vậy?`
+        : `${OWNER} ơi, ${c.title} lấy tất cả mấy món vậy?`
       return {
         kind, customer, lines, total,
         steps: [{
           prompt,
-          speech: single ? prompt : `Cậu Lớn ơi, ${c.title} lấy ${describe(lines).speech}. Tất cả mấy món vậy?`,
+          speech: single ? prompt : `${OWNER} ơi, ${c.title} lấy ${describe(lines).speech}. Tất cả mấy món vậy?`,
           expr: single ? `Đếm ${lines[0].item.emoji}: có mấy?` : `${lines.map((l) => l.qty).join(' + ')} = ?`,
           answer: total,
           hint: { groups: lines.map((l) => l.qty) },
@@ -135,8 +147,8 @@ export function genVisit(t: Tier, items: Item[] = ITEMS): Visit {
       const total = sumOf(lines)
       const paid = t.bills.find((b) => b > total) ?? maxBill
       const text = t.changeSteps === 1
-        ? `Hết ${total} ${CURRENCY}. ${c.title} đưa ${paid} ${CURRENCY}. Cậu Lớn thối lại mấy ${CURRENCY}?`
-        : `${c.title} đưa ${paid} ${CURRENCY}. Cậu Lớn thối lại mấy ${CURRENCY}?`
+        ? `Hết ${total} ${CURRENCY}. ${c.title} đưa ${paid} ${CURRENCY}. ${OWNER} thối lại mấy ${CURRENCY}?`
+        : `${c.title} đưa ${paid} ${CURRENCY}. ${OWNER} thối lại mấy ${CURRENCY}?`
       const changeStep: Step = {
         prompt: text,
         speech: text,
@@ -154,7 +166,7 @@ export function genVisit(t: Tier, items: Item[] = ITEMS): Visit {
       const qty = rand(2, t.mulQty)
       const price = rand(2, t.mulPrice)
       const total = qty * price
-      const text = `Cậu Lớn ơi, ${c.title} mua ${qty} ${item.name}, mỗi ${unitOf(item)} ${price} ${CURRENCY}. Hết bao nhiêu ${CURRENCY}?`
+      const text = `${OWNER} ơi, ${c.title} mua ${qty} ${item.name}, mỗi ${unitOf(item)} ${price} ${CURRENCY}. Hết bao nhiêu ${CURRENCY}?`
       return {
         kind, customer, lines: [{ item, qty, price }], total,
         steps: [{
@@ -172,7 +184,7 @@ export function genVisit(t: Tier, items: Item[] = ITEMS): Visit {
       const qty = rand(2, 9)
       const price = rand(2, t.divMax)
       const total = qty * price
-      const text = `Cậu Lớn ơi, ${c.title} mua ${qty} ${item.name} hết ${total} ${CURRENCY}. Mỗi ${unitOf(item)} giá mấy ${CURRENCY}?`
+      const text = `${OWNER} ơi, ${c.title} mua ${qty} ${item.name} hết ${total} ${CURRENCY}. Mỗi ${unitOf(item)} giá mấy ${CURRENCY}?`
       return {
         kind, customer, lines: [{ item, qty, price }], total, hidePrice: true,
         steps: [{ prompt: text, speech: text, expr: `${total} : ${qty} = ?`, answer: price }],
@@ -187,8 +199,8 @@ export function genVisit(t: Tier, items: Item[] = ITEMS): Visit {
       const unit = unitOf(item)
       const toFriends = Math.random() < 0.5
       const text = toFriends
-        ? `Cậu Lớn ơi, ${c.title} mua ${total} ${item.name} chia đều cho ${n} bạn. Mỗi bạn được mấy ${unit}?`
-        : `Cậu Lớn xếp ${total} ${item.name} vào ${n} túi đều nhau giúp ${c.title} nhé. Mỗi túi mấy ${unit}?`
+        ? `${OWNER} ơi, ${c.title} mua ${total} ${item.name} chia đều cho ${n} bạn. Mỗi bạn được mấy ${unit}?`
+        : `${OWNER} xếp ${total} ${item.name} vào ${n} túi đều nhau giúp ${c.title} nhé. Mỗi túi mấy ${unit}?`
       return {
         kind, customer, lines: [{ item, qty: total, price: 1 }], total,
         targets: { emoji: toFriends ? '🧒' : '🛍️', count: n },
@@ -210,7 +222,7 @@ export function genVisit(t: Tier, items: Item[] = ITEMS): Visit {
       const extra = kind === 'remainder' ? rand(1, per - 1) : 0
       const total = per * bags + extra
       const unit = unitOf(item)
-      const ask = `Cậu Lớn ơi, ${c.title} cần ${total} ${item.name}, mỗi túi đựng ${per} ${unit}.`
+      const ask = `${OWNER} ơi, ${c.title} cần ${total} ${item.name}, mỗi túi đựng ${per} ${unit}.`
       const hint = total <= DIV_HINT_MAX ? { bags: { count: bags, per, extra, emoji: '🛍️' } } : undefined
       const first: Step = {
         prompt: `${ask} ${extra ? 'Đóng được mấy túi đầy?' : 'Cần mấy túi?'}`,

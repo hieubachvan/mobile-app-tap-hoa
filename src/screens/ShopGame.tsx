@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Profile } from '../game/storage'
+import { callName, type Profile } from '../game/storage'
 import { agePatienceFactor, practiceTier, tierFor, type Op } from '../game/levels'
 import { itemsFor, patienceLabel } from '../game/items'
 import { shopLevel } from '../game/shopLevels'
@@ -31,7 +31,7 @@ interface Props {
 
 type Feedback = null | 'ok' | 'bad' | 'reveal' | 'leave'
 
-const PRAISE = ['Giỏi quá!', 'Đúng rồi!', 'Tuyệt vời!', 'Cậu Lớn siêu ghê!', 'Chính xác!']
+const praises = (name: string) => ['Giỏi quá!', 'Đúng rồi!', 'Tuyệt vời!', `${name} siêu ghê!`, 'Chính xác!']
 
 /** Khách vừa vào và đang nói: chưa trừ kiên nhẫn */
 const GRACE_MS = 3000
@@ -62,7 +62,7 @@ export default function ShopGame({ profile, practice, onFinish, onExit, onGoldBo
   })
   const [visits] = useState(() => {
     const items = itemsFor(profile.owned)
-    return Array.from({ length: tier.customers + extraCustomers(profile) }, () => genVisit(tier, items))
+    return Array.from({ length: tier.customers + extraCustomers(profile) }, () => genVisit(tier, items, callName(profile.name)))
   })
   const totalSteps = useMemo(() => visits.reduce((s, v) => s + v.steps.length, 0), [visits])
 
@@ -73,7 +73,7 @@ export default function ShopGame({ profile, practice, onFinish, onExit, onGoldBo
   const [earned, setEarned] = useState(0)
   const [feedback, setFeedback] = useState<Feedback>(null)
   const [showHint, setShowHint] = useState(false)
-  const [praise, setPraise] = useState(PRAISE[0])
+  const [praise, setPraise] = useState('Giỏi quá!')
   const [result, setResult] = useState<DayResult | null>(null)
   const [lost, setLost] = useState(0)
   const timer = useRef<number>()
@@ -111,7 +111,7 @@ export default function ShopGame({ profile, practice, onFinish, onExit, onGoldBo
     if (left <= 0) leave()
     else if (ratio < 0.3 && !warned) {
       setWarned(true)
-      speak(`Nhanh lên Cậu Lớn ơi, ${visit.customer.title} vội lắm!`)
+      speak(`Nhanh lên ${callName(profile.name)} ơi, ${visit.customer.title} vội lắm!`)
     }
   })
 
@@ -121,8 +121,8 @@ export default function ShopGame({ profile, practice, onFinish, onExit, onGoldBo
     setResult(r)
     onFinish(r)
     sfx.win()
-    if (practice) speak(`Luyện xong rồi! ${profile.name} được ${stars} sao!`)
-    else speak(r.passed ? `Hết ngày rồi! ${profile.name} được ${stars} sao!` : 'Hết ngày rồi! Mình thử lại nhé!')
+    if (practice) speak(`Luyện xong rồi! ${callName(profile.name)} được ${stars} sao!`)
+    else speak(r.passed ? `Hết ngày rồi! ${callName(profile.name)} được ${stars} sao!` : 'Hết ngày rồi! Mình thử lại nhé!')
   }
 
   const resetStep = () => {
@@ -179,7 +179,8 @@ export default function ShopGame({ profile, practice, onFinish, onExit, onGoldBo
     window.clearTimeout(timer.current)
     if (n === step.answer) {
       sfx.correct()
-      const p = PRAISE[Math.floor(Math.random() * PRAISE.length)]
+      const list = praises(callName(profile.name))
+      const p = list[Math.floor(Math.random() * list.length)]
       setPraise(p)
       setFeedback('ok')
       speak(p)

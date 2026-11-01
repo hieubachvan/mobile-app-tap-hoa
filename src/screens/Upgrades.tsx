@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Profile } from '../game/storage'
+import { callName, type Profile } from '../game/storage'
 import { UPGRADES, effectText, type Upgrade } from '../game/upgrades'
 import { levelPerks, nextShopLevel, shopLevel, type ShopLevel } from '../game/shopLevels'
 import { sfx, speak } from '../game/sound'
@@ -70,7 +70,7 @@ export default function Upgrades({ profile, onBuy, onLevelUp, onExit }: Props) {
             </button>
           </div>
         ) : (
-          <p className="practice-tip">👑 Tiệm đã đạt cấp cao nhất. Cậu Lớn giỏi quá!</p>
+          <p className="practice-tip">👑 Tiệm đã đạt cấp cao nhất. {callName(profile.name)} giỏi quá!</p>
         )}
       </section>
 
