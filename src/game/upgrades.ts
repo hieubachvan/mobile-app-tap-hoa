@@ -1,5 +1,6 @@
 import { ITEMS } from './items'
 import { shopLevel } from './shopLevels'
+import { TUNING } from './tuning'
 
 export interface Decor {
   /** Vị trí trên ảnh mặt tiền, tính theo % (dùng chung cho mọi cấp tiệm) */
@@ -23,19 +24,22 @@ export interface Upgrade {
   decor: Decor[]
 }
 
-export const UPGRADES: Upgrade[] = [
-  { id: 'plant', emoji: '🪴', name: 'Chậu cây xanh', cost: 30, decor: [{ x: 5, y: 86, size: 11 }] },
-  { id: 'lantern', emoji: '🏮', name: 'Đèn lồng đỏ', cost: 40, decor: [{ x: 12, y: 24, size: 8 }, { x: 88, y: 24, size: 8 }] },
-  { id: 'fruit', emoji: '🍉', name: 'Sạp trái cây', cost: 50, decor: [{ x: 16, y: 90, size: 9 }] },
-  { id: 'fridge', emoji: '🍦', name: 'Tủ kem mát lạnh', cost: 60, decor: [{ x: 84, y: 90, size: 9 }] },
-  { id: 'stationery', emoji: '✏️', name: 'Kệ văn phòng phẩm', cost: 60, decor: [{ x: 27, y: 92, size: 8 }] },
-  { id: 'fan', emoji: '❄️', name: 'Máy lạnh', cost: 70, patience: 0.1, decor: [{ x: 30, y: 44, size: 6 }] },
-  { id: 'cat', emoji: '🐱', name: 'Mèo thần tài', cost: 80, coins: 0.2, decor: [{ x: 95, y: 84, size: 10 }] },
-  { id: 'toys', emoji: '🧸', name: 'Góc đồ chơi', cost: 100, decor: [{ x: 73, y: 92, size: 9 }] },
-  { id: 'chair', emoji: '🪑', name: 'Ghế chờ cho khách', cost: 120, patience: 0.2, decor: [{ x: 39, y: 93, size: 8 }] },
-  { id: 'radio', emoji: '📻', name: 'Loa phát nhạc', cost: 150, customers: 1, decor: [{ x: 61, y: 93, size: 7 }] },
-  { id: 'sign', emoji: '🌟', name: 'Bảng hiệu đèn sáng', cost: 250, coins: 0.3, customers: 1, decor: [{ x: 6, y: 8, size: 7 }, { x: 94, y: 8, size: 7 }] },
+/** Hình và chỗ đặt trên mặt tiền; tên, giá, tác dụng lấy từ tuning.json */
+const LOOKS: Pick<Upgrade, 'id' | 'emoji' | 'decor'>[] = [
+  { id: 'plant', emoji: '🪴', decor: [{ x: 5, y: 86, size: 11 }] },
+  { id: 'lantern', emoji: '🏮', decor: [{ x: 12, y: 24, size: 8 }, { x: 88, y: 24, size: 8 }] },
+  { id: 'fruit', emoji: '🍉', decor: [{ x: 16, y: 90, size: 9 }] },
+  { id: 'fridge', emoji: '🍦', decor: [{ x: 84, y: 90, size: 9 }] },
+  { id: 'stationery', emoji: '✏️', decor: [{ x: 27, y: 92, size: 8 }] },
+  { id: 'fan', emoji: '❄️', decor: [{ x: 30, y: 44, size: 6 }] },
+  { id: 'cat', emoji: '🐱', decor: [{ x: 95, y: 84, size: 10 }] },
+  { id: 'toys', emoji: '🧸', decor: [{ x: 73, y: 92, size: 9 }] },
+  { id: 'chair', emoji: '🪑', decor: [{ x: 39, y: 93, size: 8 }] },
+  { id: 'radio', emoji: '📻', decor: [{ x: 61, y: 93, size: 7 }] },
+  { id: 'sign', emoji: '🌟', decor: [{ x: 6, y: 8, size: 7 }, { x: 94, y: 8, size: 7 }] },
 ]
+
+export const UPGRADES: Upgrade[] = LOOKS.map((u) => ({ ...TUNING.upgrades.find((t) => t.id === u.id)!, ...u }))
 
 interface ShopState {
   owned: string[]
@@ -61,6 +65,6 @@ export function effectText(u: Upgrade): string {
 }
 
 /** Tiền lời mỗi khách phục vụ xong */
-export const PROFIT_PER_CUSTOMER = 5
+export const PROFIT_PER_CUSTOMER = TUNING.coins.perCustomer
 /** Thưởng thêm khi bé trả lời đúng ngay mọi câu của khách đó */
-export const PERFECT_BONUS = 3
+export const PERFECT_BONUS = TUNING.coins.perfectBonus

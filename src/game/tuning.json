@@ -1,0 +1,497 @@
+{
+  "day": {
+    "daysPerTier": 2,
+    "practiceQuestions": 6,
+    "graceSeconds": 3,
+    "wrongPenalty": 0.1,
+    "stars": [0.5, 0.7, 0.9]
+  },
+  "ages": {
+    "3": {
+      "startTier": 1,
+      "patience": 1.6
+    },
+    "4": {
+      "startTier": 1,
+      "patience": 1.6
+    },
+    "5": {
+      "startTier": 2,
+      "patience": 1.25
+    },
+    "6": {
+      "startTier": 3,
+      "patience": 1.25
+    },
+    "7": {
+      "startTier": 4,
+      "patience": 1
+    },
+    "8": {
+      "startTier": 5,
+      "patience": 1
+    },
+    "9": {
+      "startTier": 6,
+      "patience": 1
+    },
+    "10": {
+      "startTier": 7,
+      "patience": 1
+    }
+  },
+  "coins": {
+    "perCustomer": 5,
+    "perfectBonus": 3,
+    "goldPerCorrect": 3,
+    "goldSeconds": 60,
+    "rewardRunsPerDay": 3,
+    "checkin": [10, 15, 20, 25, 30, 40, 80],
+    "chest": 30
+  },
+  "quests": {
+    "serve": {
+      "target": 5,
+      "reward": 15
+    },
+    "perfect": {
+      "target": 3,
+      "reward": 20
+    },
+    "gold": {
+      "target": 5,
+      "reward": 15
+    },
+    "practice": {
+      "target": 1,
+      "reward": 15
+    },
+    "stars": {
+      "target": 1,
+      "reward": 25
+    }
+  },
+  "tiers": [
+    {
+      "id": 1,
+      "name": "Đếm hàng",
+      "desc": "Đếm số món (đến 5)",
+      "questions": 10,
+      "patience": 25,
+      "kinds": ["count"],
+      "input": "choice",
+      "price": [1, 5],
+      "priceStep": 1,
+      "maxTypes": 1,
+      "qtyMax": 1,
+      "countMax": 5,
+      "maxTotal": 5,
+      "bills": [10],
+      "changeSteps": 1,
+      "mulQty": 3,
+      "mulPrice": 5,
+      "divMax": 5,
+      "shareDiv": 3,
+      "shareQuot": 3,
+      "useMul": false
+    },
+    {
+      "id": 2,
+      "name": "Cộng trong 10",
+      "desc": "Đếm và cộng tiền trong phạm vi 10",
+      "questions": 10,
+      "patience": 25,
+      "kinds": ["count", "total", "total"],
+      "input": "choice",
+      "price": [1, 5],
+      "priceStep": 1,
+      "maxTypes": 2,
+      "qtyMax": 1,
+      "countMax": 5,
+      "maxTotal": 10,
+      "bills": [10],
+      "changeSteps": 1,
+      "mulQty": 3,
+      "mulPrice": 5,
+      "divMax": 5,
+      "shareDiv": 3,
+      "shareQuot": 3,
+      "useMul": false
+    },
+    {
+      "id": 3,
+      "name": "Thối tiền trong 10",
+      "desc": "Cộng, trừ trong phạm vi 10",
+      "questions": 10,
+      "patience": 25,
+      "kinds": ["total", "change", "change"],
+      "input": "choice",
+      "price": [1, 9],
+      "priceStep": 1,
+      "maxTypes": 2,
+      "qtyMax": 1,
+      "countMax": 5,
+      "maxTotal": 10,
+      "bills": [10],
+      "changeSteps": 1,
+      "mulQty": 3,
+      "mulPrice": 5,
+      "divMax": 5,
+      "shareDiv": 3,
+      "shareQuot": 3,
+      "useMul": false
+    },
+    {
+      "id": 4,
+      "name": "Cộng trừ trong 20",
+      "desc": "Tính tổng 2–3 món, thối tiền từ 10, 20",
+      "questions": 10,
+      "patience": 25,
+      "kinds": ["total", "change"],
+      "input": "pad",
+      "price": [1, 9],
+      "priceStep": 1,
+      "maxTypes": 3,
+      "qtyMax": 1,
+      "countMax": 5,
+      "maxTotal": 19,
+      "bills": [10, 20],
+      "changeSteps": 2,
+      "mulQty": 3,
+      "mulPrice": 5,
+      "divMax": 5,
+      "shareDiv": 3,
+      "shareQuot": 3,
+      "useMul": false
+    },
+    {
+      "id": 5,
+      "name": "Trong phạm vi 50",
+      "desc": "Mua nhiều món, thối tiền từ 20, 50",
+      "questions": 10,
+      "patience": 30,
+      "kinds": ["total", "change", "change"],
+      "input": "pad",
+      "price": [2, 20],
+      "priceStep": 1,
+      "maxTypes": 3,
+      "qtyMax": 2,
+      "countMax": 5,
+      "maxTotal": 49,
+      "bills": [20, 50],
+      "changeSteps": 2,
+      "mulQty": 3,
+      "mulPrice": 5,
+      "divMax": 5,
+      "shareDiv": 3,
+      "shareQuot": 3,
+      "useMul": false
+    },
+    {
+      "id": 6,
+      "name": "Trong phạm vi 100",
+      "desc": "Cộng trừ đến 100, làm quen nhân và chia đều",
+      "questions": 10,
+      "patience": 30,
+      "kinds": ["total", "change", "multiply", "share"],
+      "input": "pad",
+      "price": [5, 50],
+      "priceStep": 1,
+      "maxTypes": 3,
+      "qtyMax": 2,
+      "countMax": 5,
+      "maxTotal": 99,
+      "bills": [50, 100],
+      "changeSteps": 2,
+      "mulQty": 3,
+      "mulPrice": 10,
+      "divMax": 5,
+      "shareDiv": 3,
+      "shareQuot": 5,
+      "useMul": true
+    },
+    {
+      "id": 7,
+      "name": "Bảng cửu chương",
+      "desc": "Nhân số lượng với giá, chia đều vào túi",
+      "questions": 10,
+      "patience": 30,
+      "kinds": ["multiply", "multiply", "total", "change", "share", "group"],
+      "input": "pad",
+      "price": [2, 20],
+      "priceStep": 1,
+      "maxTypes": 3,
+      "qtyMax": 5,
+      "countMax": 5,
+      "maxTotal": 99,
+      "bills": [50, 100],
+      "changeSteps": 2,
+      "mulQty": 9,
+      "mulPrice": 9,
+      "divMax": 5,
+      "shareDiv": 5,
+      "shareQuot": 5,
+      "useMul": true
+    },
+    {
+      "id": 8,
+      "name": "Chia đều",
+      "desc": "Chia đều, đóng túi, tìm giá một món",
+      "questions": 10,
+      "patience": 35,
+      "kinds": ["divide", "share", "group", "multiply", "change"],
+      "input": "pad",
+      "price": [2, 20],
+      "priceStep": 1,
+      "maxTypes": 3,
+      "qtyMax": 5,
+      "countMax": 5,
+      "maxTotal": 99,
+      "bills": [50, 100],
+      "changeSteps": 2,
+      "mulQty": 9,
+      "mulPrice": 10,
+      "divMax": 10,
+      "shareDiv": 9,
+      "shareQuot": 9,
+      "useMul": true
+    },
+    {
+      "id": 9,
+      "name": "Siêu thị nhí",
+      "desc": "Số lớn đến 1000, đủ 4 phép tính, chia có dư",
+      "questions": 10,
+      "patience": 40,
+      "kinds": ["total", "change", "multiply", "divide", "share", "remainder"],
+      "input": "pad",
+      "price": [10, 200],
+      "priceStep": 5,
+      "maxTypes": 3,
+      "qtyMax": 3,
+      "countMax": 5,
+      "maxTotal": 999,
+      "bills": [500, 1000],
+      "changeSteps": 2,
+      "mulQty": 9,
+      "mulPrice": 50,
+      "divMax": 20,
+      "shareDiv": 9,
+      "shareQuot": 12,
+      "useMul": true
+    }
+  ],
+  "shopLevels": [
+    {
+      "level": 1,
+      "name": "Sạp gỗ nhỏ",
+      "cost": 0,
+      "coins": 0,
+      "patience": 0,
+      "customers": 0
+    },
+    {
+      "level": 2,
+      "name": "Tiệm mái hiên",
+      "cost": 300,
+      "coins": 0.1,
+      "patience": 0,
+      "customers": 0
+    },
+    {
+      "level": 3,
+      "name": "Tiệm tạp hóa lớn",
+      "cost": 800,
+      "coins": 0.2,
+      "patience": 0.05,
+      "customers": 1
+    },
+    {
+      "level": 4,
+      "name": "Siêu thị mini",
+      "cost": 1600,
+      "coins": 0.35,
+      "patience": 0.1,
+      "customers": 1
+    },
+    {
+      "level": 5,
+      "name": "Tạp hóa VIP PRO",
+      "cost": 3000,
+      "coins": 0.5,
+      "patience": 0.2,
+      "customers": 2
+    }
+  ],
+  "upgrades": [
+    {
+      "id": "plant",
+      "name": "Chậu cây xanh",
+      "cost": 30,
+      "patience": 0,
+      "coins": 0,
+      "customers": 0
+    },
+    {
+      "id": "lantern",
+      "name": "Đèn lồng đỏ",
+      "cost": 40,
+      "patience": 0,
+      "coins": 0,
+      "customers": 0
+    },
+    {
+      "id": "fruit",
+      "name": "Sạp trái cây",
+      "cost": 50,
+      "patience": 0,
+      "coins": 0,
+      "customers": 0
+    },
+    {
+      "id": "fridge",
+      "name": "Tủ kem mát lạnh",
+      "cost": 60,
+      "patience": 0,
+      "coins": 0,
+      "customers": 0
+    },
+    {
+      "id": "stationery",
+      "name": "Kệ văn phòng phẩm",
+      "cost": 60,
+      "patience": 0,
+      "coins": 0,
+      "customers": 0
+    },
+    {
+      "id": "fan",
+      "name": "Máy lạnh",
+      "cost": 70,
+      "patience": 0.1,
+      "coins": 0,
+      "customers": 0
+    },
+    {
+      "id": "cat",
+      "name": "Mèo thần tài",
+      "cost": 80,
+      "patience": 0,
+      "coins": 0.2,
+      "customers": 0
+    },
+    {
+      "id": "toys",
+      "name": "Góc đồ chơi",
+      "cost": 100,
+      "patience": 0,
+      "coins": 0,
+      "customers": 0
+    },
+    {
+      "id": "chair",
+      "name": "Ghế chờ cho khách",
+      "cost": 120,
+      "patience": 0.2,
+      "coins": 0,
+      "customers": 0
+    },
+    {
+      "id": "radio",
+      "name": "Loa phát nhạc",
+      "cost": 150,
+      "patience": 0,
+      "coins": 0,
+      "customers": 1
+    },
+    {
+      "id": "sign",
+      "name": "Bảng hiệu đèn sáng",
+      "cost": 250,
+      "patience": 0,
+      "coins": 0.3,
+      "customers": 1
+    }
+  ],
+  "customers": [
+    {
+      "id": "ba",
+      "title": "Bà",
+      "patience": 1.5
+    },
+    {
+      "id": "ong",
+      "title": "Ông",
+      "patience": 1.4
+    },
+    {
+      "id": "nong-dan",
+      "title": "Bác nông dân",
+      "patience": 1.2
+    },
+    {
+      "id": "co-giao",
+      "title": "Cô giáo",
+      "patience": 1.1
+    },
+    {
+      "id": "co-tap-de",
+      "title": "Cô",
+      "patience": 1.1
+    },
+    {
+      "id": "cong-nhan",
+      "title": "Chú công nhân",
+      "patience": 1
+    },
+    {
+      "id": "cong-an",
+      "title": "Chú công an",
+      "patience": 1
+    },
+    {
+      "id": "sinh-vien",
+      "title": "Anh sinh viên",
+      "patience": 1
+    },
+    {
+      "id": "hs-nu",
+      "title": "Chị học sinh",
+      "patience": 0.9
+    },
+    {
+      "id": "hs-nam",
+      "title": "Anh học sinh",
+      "patience": 0.9
+    },
+    {
+      "id": "bac-si",
+      "title": "Chú bác sĩ",
+      "patience": 0.85
+    },
+    {
+      "id": "be-na",
+      "title": "Bé Na",
+      "patience": 0.8
+    },
+    {
+      "id": "dau-bep",
+      "title": "Chú đầu bếp",
+      "patience": 0.8
+    },
+    {
+      "id": "giao-hang",
+      "title": "Chú giao hàng",
+      "patience": 0.75
+    },
+    {
+      "id": "tai-xe",
+      "title": "Anh tài xế",
+      "patience": 0.7
+    },
+    {
+      "id": "be-bin",
+      "title": "Bé Bin",
+      "patience": 0.7
+    }
+  ]
+}

@@ -5,6 +5,7 @@ import { OPS, tierFor, type Op } from '../game/levels'
 import { exprToSpeech, genDrill, type Drill } from '../game/questions'
 import { distractors, rand, shuffle } from '../game/random'
 import { sfx, speak } from '../game/sound'
+import { TUNING } from '../game/tuning'
 
 interface Props {
   profile: Profile
@@ -21,8 +22,8 @@ const H = 560
 const GROUND = 110
 const PIVOT = { x: W / 2, y: GROUND - 6 }
 const ROPE_MIN = 26
-const GAME_TIME = 60
-const COINS_PER_CORRECT = 3
+const GAME_TIME = TUNING.coins.goldSeconds
+const COINS_PER_CORRECT = TUNING.coins.goldPerCorrect
 
 type NuggetKind = 'gold' | 'rock' | 'diamond'
 

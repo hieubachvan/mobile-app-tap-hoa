@@ -1,3 +1,5 @@
+import { TUNING } from './tuning'
+
 /**
  * divide: biết tổng tiền, tìm giá 1 món
  * share: chia đều N món cho k bạn / vào k túi
@@ -37,69 +39,29 @@ export interface Tier {
   /** Viết số lượng dạng phép nhân (2 × 5) hay cộng lặp (5 + 5) */
   useMul: boolean
   input: 'choice' | 'pad'
-  customers: number
+  /** Số câu hỏi mỗi ngày: khách đến đến khi đủ (khách cuối hỏi 2 câu thì có thể dư 1) */
+  questions: number
   /** Số giây khách chờ cho mỗi câu hỏi (trước khi nhân hệ số kiên nhẫn) */
   patience: number
 }
 
-const base = {
-  price: [1, 5] as [number, number],
-  priceStep: 1,
-  maxTypes: 2,
-  qtyMax: 1,
-  countMax: 5,
-  maxTotal: 10,
-  bills: [10],
-  changeSteps: 1 as 1 | 2,
-  mulQty: 3,
-  mulPrice: 5,
-  divMax: 5,
-  shareDiv: 3,
-  shareQuot: 3,
-  useMul: false,
-  input: 'choice' as 'choice' | 'pad',
-  customers: 5,
-  patience: 25,
+/** 9 cấp độ, chỉnh trong tuning.json */
+export const TIERS: Tier[] = TUNING.tiers
+
+/** Thông số theo tuổi; tuổi ngoài 3–10 lấy tuổi gần nhất */
+function ageRow(age: number) {
+  const ages = Object.keys(TUNING.ages).map(Number)
+  const near = ages.reduce((best, a) => (Math.abs(a - age) < Math.abs(best - age) ? a : best), ages[0])
+  return TUNING.ages[near]
 }
 
-export const TIERS: Tier[] = [
-  { ...base, id: 1, name: 'Đếm hàng', desc: 'Đếm số món (đến 5)', kinds: ['count'], maxTypes: 1, maxTotal: 5, customers: 4 },
-  { ...base, id: 2, name: 'Cộng trong 10', desc: 'Đếm và cộng tiền trong phạm vi 10', kinds: ['count', 'total', 'total'] },
-  { ...base, id: 3, name: 'Thối tiền trong 10', desc: 'Cộng, trừ trong phạm vi 10', kinds: ['total', 'change', 'change'], price: [1, 9] },
-  {
-    ...base, id: 4, name: 'Cộng trừ trong 20', desc: 'Tính tổng 2–3 món, thối tiền từ 10, 20',
-    kinds: ['total', 'change'], price: [1, 9], maxTypes: 3, maxTotal: 19, bills: [10, 20], changeSteps: 2, input: 'pad',
-  },
-  {
-    ...base, id: 5, patience: 30, name: 'Trong phạm vi 50', desc: 'Mua nhiều món, thối tiền từ 20, 50',
-    kinds: ['total', 'change', 'change'], price: [2, 20], maxTypes: 3, qtyMax: 2, maxTotal: 49, bills: [20, 50], changeSteps: 2, input: 'pad', customers: 6,
-  },
-  {
-    ...base, id: 6, patience: 30, name: 'Trong phạm vi 100', desc: 'Cộng trừ đến 100, làm quen nhân và chia đều',
-    kinds: ['total', 'change', 'multiply', 'share'], price: [5, 50], maxTypes: 3, qtyMax: 2, maxTotal: 99, bills: [50, 100], changeSteps: 2, mulQty: 3, mulPrice: 10, shareDiv: 3, shareQuot: 5, useMul: true, input: 'pad', customers: 6,
-  },
-  {
-    ...base, id: 7, patience: 30, name: 'Bảng cửu chương', desc: 'Nhân số lượng với giá, chia đều vào túi',
-    kinds: ['multiply', 'multiply', 'total', 'change', 'share', 'group'], price: [2, 20], maxTypes: 3, qtyMax: 5, maxTotal: 99, bills: [50, 100], changeSteps: 2, mulQty: 9, mulPrice: 9, shareDiv: 5, shareQuot: 5, useMul: true, input: 'pad', customers: 6,
-  },
-  {
-    ...base, id: 8, patience: 35, name: 'Chia đều', desc: 'Chia đều, đóng túi, tìm giá một món',
-    kinds: ['divide', 'share', 'group', 'multiply', 'change'], price: [2, 20], maxTypes: 3, qtyMax: 5, maxTotal: 99, bills: [50, 100], changeSteps: 2, mulQty: 9, mulPrice: 10, divMax: 10, shareDiv: 9, shareQuot: 9, useMul: true, input: 'pad', customers: 7,
-  },
-  {
-    ...base, id: 9, patience: 40, name: 'Siêu thị nhí', desc: 'Số lớn đến 1000, đủ 4 phép tính, chia có dư',
-    kinds: ['total', 'change', 'multiply', 'divide', 'share', 'remainder'], price: [10, 200], priceStep: 5, maxTypes: 3, qtyMax: 3, maxTotal: 999, bills: [500, 1000], changeSteps: 2, mulQty: 9, mulPrice: 50, divMax: 20, shareDiv: 9, shareQuot: 12, useMul: true, input: 'pad', customers: 8,
-  },
-]
-
-/** Cấp khởi đầu theo tuổi: 3–4 tuổi → cấp 1, 5 tuổi → cấp 2, ... 10 tuổi → cấp 7 */
+/** Cấp khởi đầu theo tuổi */
 export function startTierForAge(age: number): number {
-  if (age <= 4) return 1
-  return Math.min(TIERS.length, age - 3)
+  return Math.min(TIERS.length, Math.max(1, ageRow(age).startTier))
 }
 
-/** Cứ qua 2 ngày lại lên một cấp */
-export const DAYS_PER_TIER = 2
+/** Cứ qua bấy nhiêu ngày lại lên một cấp */
+export const DAYS_PER_TIER = TUNING.day.daysPerTier
 
 export function tierFor(age: number, day: number): Tier {
   const id = Math.min(TIERS.length, startTierForAge(age) + Math.floor((day - 1) / DAYS_PER_TIER))
@@ -118,7 +80,7 @@ export function practiceTier(t: Tier, op: Op): Tier {
   const small = t.id <= 3
   const mid = t.id <= 6
   const name = `Luyện phép ${OPS.find((o) => o.op === op)!.name.toLowerCase()}`
-  const p: Tier = { ...t, name, customers: 6 }
+  const p: Tier = { ...t, name, questions: TUNING.day.practiceQuestions }
   switch (op) {
     case 'add':
       return { ...p, kinds: t.id <= 2 ? ['count', 'total'] : ['total'], maxTypes: Math.max(2, t.maxTypes) }
@@ -137,7 +99,5 @@ export function practiceTier(t: Tier, op: Op): Tier {
 
 /** Bé càng nhỏ khách càng chờ lâu */
 export function agePatienceFactor(age: number) {
-  if (age <= 4) return 1.6
-  if (age <= 6) return 1.25
-  return 1
+  return ageRow(age).patience
 }

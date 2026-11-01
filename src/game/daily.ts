@@ -1,10 +1,12 @@
-/** Quà điểm danh theo ngày trong chuỗi 7 ngày (ngày 7 là quà lớn) */
-export const CHECKIN_REWARDS = [10, 15, 20, 25, 30, 40, 80]
+import { TUNING } from './tuning'
 
-export const CHEST_REWARD = 30
+/** Quà điểm danh theo ngày trong chuỗi 7 ngày (ngày 7 là quà lớn) */
+export const CHECKIN_REWARDS = TUNING.coins.checkin
+
+export const CHEST_REWARD = TUNING.coins.chest
 
 /** Mỗi ngày chỉ bấy nhiêu lượt Đào vàng / Luyện riêng được nhận xu; chơi thêm vẫn được nhưng không có xu */
-export const REWARD_RUNS_PER_DAY = 3
+export const REWARD_RUNS_PER_DAY = TUNING.coins.rewardRunsPerDay
 
 export type RewardGame = 'gold' | 'practice'
 
@@ -26,13 +28,10 @@ export interface DailyState {
   rewardRuns?: Partial<Record<RewardGame, number>>
 }
 
-const POOL: Omit<Quest, 'progress' | 'claimed'>[] = [
-  { kind: 'serve', target: 5, reward: 15 },
-  { kind: 'perfect', target: 3, reward: 20 },
-  { kind: 'gold', target: 5, reward: 15 },
-  { kind: 'practice', target: 1, reward: 15 },
-  { kind: 'stars', target: 1, reward: 25 },
-]
+const POOL: Omit<Quest, 'progress' | 'claimed'>[] = (Object.keys(TUNING.quests) as QuestKind[]).map((kind) => ({
+  kind,
+  ...TUNING.quests[kind],
+}))
 
 export function questText(q: Quest) {
   switch (q.kind) {

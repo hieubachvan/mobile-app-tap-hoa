@@ -3,7 +3,7 @@ import { DAYS_PER_TIER, TIERS, tierFor } from '../game/levels'
 import { sfx } from '../game/sound'
 import { REWARD_RUNS_PER_DAY, claimable, ensureDaily, rewardRunsLeft } from '../game/daily'
 import { nextShopLevel, shopLevel } from '../game/shopLevels'
-import ShopDecor from '../components/ShopDecor'
+import StreetScene from '../components/StreetScene'
 import ShopSign from '../components/ShopSign'
 
 interface Props {
@@ -56,7 +56,7 @@ export default function Home({ profile, onPlay, onToggleSound, onReset }: Props)
 
       <div className="storefront">
         <ShopSign name={profile.name} />
-        <ShopDecor level={level} owned={profile.owned} />
+        <StreetScene mode="home" level={level} owned={profile.owned} />
         <div className="level-caption">
           <span className="level-badge">Cấp {level.level}</span> {level.name}
         </div>

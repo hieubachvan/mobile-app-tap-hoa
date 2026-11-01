@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { callName, type Profile } from '../game/storage'
 import { agePatienceFactor, practiceTier, tierFor, type Op } from '../game/levels'
-import { itemsFor, patienceLabel } from '../game/items'
+import { itemsFor } from '../game/items'
 import { shopLevel } from '../game/shopLevels'
-import ShopDecor from '../components/ShopDecor'
+import StreetScene, { type StreetHandle } from '../components/StreetScene'
 import { PERFECT_BONUS, PROFIT_PER_CUSTOMER, coinBonus, extraCustomers, patienceBonus } from '../game/upgrades'
 import { CURRENCY, NO_PRICE_KINDS, genVisit, makeChoices } from '../game/questions'
 import { sfx, speak } from '../game/sound'
+import { TUNING } from '../game/tuning'
 import AnswerInput from '../components/AnswerInput'
 import HintDots from '../components/HintDots'
 
@@ -36,22 +37,19 @@ type Feedback = null | 'ok' | 'bad' | 'reveal' | 'leave'
 const praises = (name: string) => ['Giỏi quá!', 'Đúng rồi!', 'Tuyệt vời!', `${name} siêu ghê!`, 'Chính xác!']
 
 /** Khách vừa vào và đang nói: chưa trừ kiên nhẫn */
-const GRACE_MS = 3000
+const GRACE_MS = TUNING.day.graceSeconds * 1000
 const TICK_MS = 100
 /** Trả lời sai làm khách sốt ruột thêm (tỉ lệ trên tổng kiên nhẫn) */
-const WRONG_PENALTY = 0.1
+const WRONG_PENALTY = TUNING.day.wrongPenalty
 const MAX_RATING = 3
-
-function mood(ratio: number) {
-  if (ratio > 0.6) return '😊'
-  if (ratio > 0.3) return '😐'
-  return '😠'
-}
+/** Khách cuối mua xong: chờ khách xách túi đi rồi mới hiện kết quả */
+const LAST_EXIT_MS = 1300
 
 function starsFor(ratio: number) {
-  if (ratio >= 0.9) return 3
-  if (ratio >= 0.7) return 2
-  if (ratio >= 0.5) return 1
+  const [one, two, three] = TUNING.day.stars
+  if (ratio >= three) return 3
+  if (ratio >= two) return 2
+  if (ratio >= one) return 1
   return 0
 }
 
@@ -65,7 +63,12 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
   })
   const [visits] = useState(() => {
     const items = itemsFor(profile.owned)
-    return Array.from({ length: tier.customers + extraCustomers(profile) }, () => genVisit(tier, items, callName(profile.name)))
+    const next = () => genVisit(tier, items, callName(profile.name))
+    const list = [next()]
+    // Khách đến đến khi đủ số câu trong ngày; đồ nâng cấp "thêm khách" cộng thêm khách sau đó
+    for (let n = list[0].steps.length; n < tier.questions; n += list[list.length - 1].steps.length) list.push(next())
+    for (let i = 0; i < extraCustomers(profile); i++) list.push(next())
+    return list
   })
   const totalSteps = useMemo(() => visits.reduce((s, v) => s + v.steps.length, 0), [visits])
 
@@ -87,36 +90,47 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
   /** Tổng thời gian (ms) khách thứ i chịu chờ */
   const patienceMs = (i: number) =>
     tier.patience * visits[i].steps.length * visits[i].customer.patience * agePatienceFactor(profile.age) * patienceBonus(profile) * 1000
-  const [left, setLeft] = useState(() => patienceMs(0) + GRACE_MS)
-  const [warned, setWarned] = useState(false)
+  const scene = useRef<StreetHandle>(null)
+  /** Khách đã đi tới quầy: lúc này mới nói và mới tính giờ chờ */
+  const [arrived, setArrived] = useState(false)
+  // Thời gian chờ để trong ref: đếm giờ không làm vẽ lại cả màn, cảnh tự đọc mỗi khung hình
+  const left = useRef(patienceMs(0) + GRACE_MS)
+  const warned = useRef(false)
+  const gone = useRef(false)
 
   const visit = visits[vi]
   const step = visit.steps[si]
   const choices = useMemo(() => makeChoices(step.answer), [step])
   const maxMs = patienceMs(vi)
-  const ratio = Math.max(0, Math.min(1, left / maxMs))
-  const paused = result !== null || feedback === 'ok' || feedback === 'reveal' || feedback === 'leave'
+  const ratio = () => Math.max(0, Math.min(1, left.current / maxMs))
+  const paused = result !== null || !arrived || feedback === 'ok' || feedback === 'reveal' || feedback === 'leave'
 
   useEffect(() => {
-    if (!result) speak(step.speech)
-  }, [step, result])
+    if (!result && arrived) speak(step.speech)
+  }, [step, result, arrived])
 
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
   useEffect(() => {
-    if (paused) return
-    const id = window.setInterval(() => setLeft((l) => l - TICK_MS), TICK_MS)
-    return () => window.clearInterval(id)
-  }, [paused])
+    scene.current?.enter(visit.customer, () => setArrived(true))
+  }, [vi])
+
+  const tick = useRef(() => {})
+  tick.current = () => {
+    if (gone.current) return
+    left.current -= TICK_MS
+    if (left.current <= 0) leave()
+    else if (ratio() < 0.3 && !warned.current) {
+      warned.current = true
+      speak(`Nhanh lên ${callName(profile.name)} ơi, ${visit.customer.title} vội lắm!`)
+    }
+  }
 
   useEffect(() => {
     if (paused) return
-    if (left <= 0) leave()
-    else if (ratio < 0.3 && !warned) {
-      setWarned(true)
-      speak(`Nhanh lên ${callName(profile.name)} ơi, ${visit.customer.title} vội lắm!`)
-    }
-  })
+    const id = window.setInterval(() => tick.current(), TICK_MS)
+    return () => window.clearInterval(id)
+  }, [paused])
 
   const finishDay = (coins: number, ft: number, lostNow: number) => {
     const stars = Math.max(0, Math.min(starsFor(ft / totalSteps), MAX_RATING - lostNow))
@@ -137,13 +151,15 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
   const nextVisit = (coins: number, ft: number, lostNow: number) => {
     resetStep()
     visitClean.current = true
+    setArrived(false)
     if (vi + 1 < visits.length) {
       setVi(vi + 1)
       setSi(0)
-      setLeft(patienceMs(vi + 1) + GRACE_MS)
-      setWarned(false)
+      left.current = patienceMs(vi + 1) + GRACE_MS
+      warned.current = false
+      gone.current = false
     } else {
-      finishDay(coins, ft, lostNow)
+      timer.current = window.setTimeout(() => finishDay(coins, ft, lostNow), LAST_EXIT_MS)
     }
   }
 
@@ -163,13 +179,16 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
     const coins = earned + profit
     setEarned(coins)
     sfx.coin()
+    scene.current?.leave('happy', rewarded ? profit : 0)
     nextVisit(coins, ft, lost)
   }
 
   /** Hết kiên nhẫn: khách bỏ về, không trả tiền, tiệm mất 1 sao */
   const leave = () => {
     window.clearTimeout(timer.current)
+    gone.current = true
     sfx.wrong()
+    scene.current?.leave('angry')
     setFeedback('leave')
     const lostNow = lost + 1
     setLost(lostNow)
@@ -187,13 +206,15 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
       setPraise(p)
       setFeedback('ok')
       speak(p)
+      scene.current?.react('ok')
       timer.current = window.setTimeout(() => advance(wrong === 0), 1100)
       return
     }
     sfx.wrong()
+    scene.current?.react('bad')
     const w = wrong + 1
     setWrong(w)
-    setLeft((l) => Math.min(l, maxMs) - maxMs * WRONG_PENALTY)
+    left.current = Math.min(left.current, maxMs) - maxMs * WRONG_PENALTY
     if (w >= 2) setShowHint(true)
     if (w >= 3) {
       setFeedback('reveal')
@@ -273,42 +294,35 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
         </div>
       </header>
 
-      <div className="scene">
-        <div className="scene-shop">
-          <ShopDecor level={shopLevel(profile.shopLevel)} owned={profile.owned} />
-        </div>
-        <div className={`customer-col ${feedback === 'leave' ? 'leaving' : ''}`} key={vi}>
-          <div className="customer">
-            {visit.customer.image ? (
-              <img className="customer-img" src={visit.customer.image} alt={visit.customer.title} draggable={false} />
-            ) : (
-              <span className="customer-emoji">{visit.customer.emoji}</span>
-            )}
-            <span className="mood">{feedback === 'leave' ? '😤' : mood(ratio)}</span>
-          </div>
-          <div className="patience" title="Độ kiên nhẫn của khách">
-            <div
-              className={`patience-fill ${ratio <= 0.3 ? 'low' : ratio <= 0.6 ? 'mid' : ''}`}
-              style={{ width: `${ratio * 100}%` }}
-            />
-          </div>
-          {patienceLabel(visit.customer) && <div className="trait">{patienceLabel(visit.customer)}</div>}
-        </div>
-      </div>
+      <StreetScene
+        ref={scene}
+        mode="shop"
+        level={shopLevel(profile.shopLevel)}
+        owned={profile.owned}
+        opening
+        getPatience={ratio}
+      />
 
-      <div className={`bubble ${feedback === 'bad' ? 'shake' : ''}`} key={`b${vi}-${si}`}>
-        <p>{step.prompt}</p>
-        <div className="bubble-tools">
-          <button className="speak-btn" onClick={() => speak(step.speech)} aria-label="Đọc lại">
-            🔊
-          </button>
-          {!showHint && feedback !== 'reveal' && (
-            <button className="speak-btn" onClick={() => setShowHint(true)} aria-label="Gợi ý">
-              💡
+      {arrived ? (
+        <div className={`bubble ${feedback === 'bad' ? 'shake' : ''}`} key={`b${vi}-${si}`}>
+          <p>{step.prompt}</p>
+          <div className="bubble-tools">
+            <button className="speak-btn" onClick={() => speak(step.speech)} aria-label="Đọc lại">
+              🔊
             </button>
-          )}
+            {!showHint && feedback !== 'reveal' && (
+              <button className="speak-btn" onClick={() => setShowHint(true)} aria-label="Gợi ý">
+                💡
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      ) : (
+        // Khách đang đi vào: chưa nói gì
+        <div className="bubble waiting">
+          <p className="typing">• • •</p>
+        </div>
+      )}
 
       <div className="counter">
         {visit.lines.map((l, i) => (

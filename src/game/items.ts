@@ -1,3 +1,5 @@
+import { TUNING } from './tuning'
+
 export interface Item {
   emoji: string
   /** Đơn vị + tên, vd "quả táo" — chữ đầu là đơn vị đếm */
@@ -37,26 +39,45 @@ export const unitOf = (item: Item) => item.name.split(' ')[0]
 export const nounOf = (item: Item) => item.name.split(' ').slice(1).join(' ')
 
 export interface Customer {
+  /** Khớp với tuning.json và tên hình cust-<id>.webp */
+  id: string
   emoji: string
   /** Cách khách tự xưng, vd "Bà", "Chú" */
   title: string
   /** Hệ số kiên nhẫn: > 1 chờ lâu, < 1 vội */
   patience: number
-  /** Hình vẽ nhân vật trong public/img; chưa có thì dùng emoji */
+  /**
+   * Hình vẽ nhân vật trong public/img; chưa có thì dùng emoji.
+   * Các hình cust-*.webp cắt từ nhanvat.png theo cùng một tỉ lệ (cao nhất 320px) để giữ chênh lệch cao thấp.
+   */
   image?: string
 }
 
-export const CUSTOMERS: Customer[] = [
-  { emoji: '👵', title: 'Bà', patience: 1.5, image: '/img/balao.webp' },
-  { emoji: '👴', title: 'Ông', patience: 1.4, image: '/img/onglao.webp' },
-  { emoji: '🧑‍🌾', title: 'Bác nông dân', patience: 1.2 },
-  { emoji: '👩', title: 'Cô', patience: 1 },
-  { emoji: '👨', title: 'Chú', patience: 1 },
-  { emoji: '👮', title: 'Chú công an', patience: 0.9 },
-  { emoji: '👧', title: 'Bé Na', patience: 0.8 },
-  { emoji: '👩‍🍳', title: 'Cô đầu bếp', patience: 0.75 },
-  { emoji: '👦', title: 'Bé Bin', patience: 0.7 },
-]
+/** Emoji dự phòng khi chưa tải được hình; tên gọi và độ kiên nhẫn lấy từ tuning.json */
+const EMOJI: Record<string, string> = {
+  ba: '👵',
+  ong: '👴',
+  'nong-dan': '🧑‍🌾',
+  'co-giao': '👩‍🏫',
+  'co-tap-de': '👩',
+  'cong-nhan': '👷',
+  'cong-an': '👮',
+  'sinh-vien': '🧑‍🎓',
+  'hs-nu': '👧',
+  'hs-nam': '👦',
+  'bac-si': '🧑‍⚕️',
+  'be-na': '👧',
+  'dau-bep': '🧑‍🍳',
+  'giao-hang': '📦',
+  'tai-xe': '🧑',
+  'be-bin': '👦',
+}
+
+export const CUSTOMERS: Customer[] = TUNING.customers.map((c) => ({
+  ...c,
+  emoji: EMOJI[c.id] ?? '🙂',
+  image: `/img/cust-${c.id}.webp`,
+}))
 
 export function patienceLabel(c: Customer) {
   if (c.patience >= 1.3) return '🐢 Thong thả'

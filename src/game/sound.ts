@@ -28,6 +28,12 @@ export const sfx = {
   coin: () => [988, 1319].forEach((f, i) => tone(f, i * 0.07, 0.25, 'square', 0.06)),
   win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.12, 0.3, 'triangle')),
   shoot: () => tone(300, 0, 0.12, 'square', 0.05),
+  /** Chuông cửa khi khách bước vào tiệm */
+  bell: () => [1568, 1319].forEach((f, i) => tone(f, i * 0.16, 0.5, 'sine', 0.12)),
+  /** Cửa cuốn kéo lên */
+  shutter: () => [0, 1, 2, 3, 4, 5, 6, 7].forEach((i) => tone(140 + i * 18, i * 0.09, 0.07, 'square', 0.035)),
+  /** Bé chạm vào đồ vật, người đi đường */
+  pop: () => tone(880, 0, 0.08, 'sine', 0.1),
 }
 
 // ---------- Đọc tiếng Việt ----------
@@ -53,48 +59,8 @@ if (hasSynth) {
   window.speechSynthesis.addEventListener('voiceschanged', pickVietnameseVoice)
 }
 
-/**
- * Dự phòng khi thiết bị không có giọng Việt: phát âm thanh từ dịch vụ TTS online.
- * Lưu ý: đây là endpoint không chính thức của Google Translate, chỉ dùng cho bản thử nghiệm.
- */
-const onlineAudio = typeof Audio !== 'undefined' ? new Audio() : null
-let onlineQueue: string[] = []
-
-function chunk(text: string, max = 180): string[] {
-  const parts = text.match(/[^.!?,]+[.!?,]?/g) ?? [text]
-  const out: string[] = []
-  let cur = ''
-  for (const p of parts) {
-    if ((cur + p).length > max && cur) {
-      out.push(cur.trim())
-      cur = ''
-    }
-    cur += p
-  }
-  if (cur.trim()) out.push(cur.trim())
-  return out
-}
-
-function playNextOnline() {
-  const next = onlineQueue.shift()
-  if (!next || !onlineAudio) return
-  onlineAudio.src = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=vi&ttsspeed=0.8&q=${encodeURIComponent(next)}`
-  onlineAudio.play().catch(() => (onlineQueue = []))
-}
-
-onlineAudio?.addEventListener('ended', playNextOnline)
-
-function speakOnline(text: string) {
-  if (!onlineAudio) return
-  onlineAudio.pause()
-  onlineQueue = chunk(text)
-  playNextOnline()
-}
-
 function stopSpeaking() {
   if (hasSynth) window.speechSynthesis.cancel()
-  onlineQueue = []
-  onlineAudio?.pause()
 }
 
 /** Đọc to câu hỏi bằng giọng tiếng Việt (cho bé chưa biết đọc) */
@@ -103,8 +69,8 @@ export function speak(text: string) {
   stopSpeaking()
   if (!voicesLoaded) pickVietnameseVoice()
   if (!hasSynth || !viVoice) {
-    // Không có giọng Việt trên máy: không để giọng tiếng Anh đọc chữ Việt
-    speakOnline(text)
+    // Không có giọng Việt trên máy: im lặng, không để giọng tiếng Anh đọc chữ Việt.
+    // Không dùng TTS online để app không gửi lời thoại (có tên bé) ra ngoài.
     return
   }
   const u = new SpeechSynthesisUtterance(text)
