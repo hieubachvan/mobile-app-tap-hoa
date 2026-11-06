@@ -3,6 +3,9 @@ import type { Profile } from '../game/storage'
 import { MAX_SHOP_LEVEL } from '../game/shopLevels'
 import { UPGRADES } from '../game/upgrades'
 import { newDaily, today, yesterday } from '../game/daily'
+import { DAYS_PER_TIER, levelOf } from '../game/levels'
+import { CROPS, FIELDS, addStock, cropOf, newFarm } from '../game/farm'
+import { coopOf } from '../game/coop'
 
 interface Props {
   profile: Profile
@@ -36,7 +39,7 @@ export default function DevPanel({ profile, update }: Props) {
         </button>
       </div>
       <div className="dev-info">
-        🪙 {profile.coins} · Cấp tiệm {profile.shopLevel} · Ngày {profile.day} · Tuổi {profile.age} · 🔥 {profile.streak}
+        🪙 {profile.coins} · Ngày {profile.day} · Cấp {levelOf(profile)} (tiến độ {profile.progress}) · Tuổi {profile.age} · 🔥 {profile.streak}
       </div>
 
       <div className="dev-label">Xu</div>
@@ -60,8 +63,36 @@ export default function DevPanel({ profile, update }: Props) {
       <div className="dev-row">
         {btn('Ngày −1', () => update((p) => ({ day: Math.max(1, p.day - 1) })))}
         {btn('Ngày +1', () => update((p) => ({ day: p.day + 1 })))}
+        {btn('Cấp −1', () => update((p) => ({ progress: Math.max(0, p.progress - DAYS_PER_TIER), slump: 0 })))}
+        {btn('Cấp +1', () => update((p) => ({ progress: p.progress + DAYS_PER_TIER, slump: 0 })))}
         {btn('Tuổi −1', () => update((p) => ({ age: Math.max(3, p.age - 1) })))}
         {btn('Tuổi +1', () => update((p) => ({ age: Math.min(10, p.age + 1) })))}
+      </div>
+
+      <div className="dev-label">Nông trại</div>
+      <div className="dev-row">
+        {btn('Bón tiếp được', () => update((p) => ({ runs: p.runs + 1 })))}
+        {btn('Chín hết', () =>
+          update((p) => ({
+            farm: { ...p.farm, tiles: Object.fromEntries(Object.entries(p.farm.tiles).map(([k, x]) => [k, { ...x, fed: cropOf(x.crop).feeds }])) },
+          })),
+        )}
+        {btn('Kho +5 mỗi loại', () =>
+          update((p) => ({ farm: { ...p.farm, stock: addStock(p.farm.stock, Object.fromEntries(CROPS.map((c) => [c.id, 5]))) } })),
+        )}
+        {btn('Ruộng to nhất', () => update((p) => ({ farm: { ...p.farm, size: FIELDS.length - 1 } })))}
+        {btn('Nông trại mới', () => update({ farm: newFarm() }))}
+      </div>
+
+      <div className="dev-label">Chuồng gà</div>
+      <div className="dev-row">
+        {btn('Qua 1 lượt (gà đói/đẻ)', () => update((p) => ({ runs: p.runs + 1 })))}
+        {btn('Ổ +5 🥚', () => update((p) => {
+          const c = coopOf(p.farm.coop)
+          return { farm: { ...p.farm, coop: { ...c, nest: c.nest + 5 } } }
+        }))}
+        {btn('Chuột đến lại', () => update((p) => ({ farm: { ...p.farm, coop: { ...coopOf(p.farm.coop), raidDate: '' } } })))}
+        {btn('Chuồng mới', () => update((p) => ({ farm: { ...p.farm, coop: coopOf(undefined) } })))}
       </div>
 
       <div className="dev-label">Điểm danh & nhiệm vụ</div>

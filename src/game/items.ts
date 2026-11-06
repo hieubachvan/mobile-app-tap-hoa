@@ -6,6 +6,8 @@ export interface Item {
   name: string
   /** Id món nâng cấp tiệm cần có để bán mặt hàng này; không có = bán từ đầu */
   pack?: string
+  /** Id cây ở nông trại: nông sản nhà trồng, bán được thêm xu */
+  crop?: string
 }
 
 export const ITEMS: Item[] = [

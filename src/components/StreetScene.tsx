@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import type { ShopLevel } from '../game/shopLevels'
 import { UPGRADES } from '../game/upgrades'
 import { CUSTOMERS, patienceLabel, type Customer } from '../game/items'
-import type { Street } from '../scene/street'
+import type { MarketSlot, Street } from '../scene/street'
 import ShopDecor from './ShopDecor'
 
 export interface StreetHandle {
@@ -20,6 +20,8 @@ interface Props {
   opening?: boolean
   /** Độ kiên nhẫn 0–1 của khách đang đứng quầy, đọc mỗi khung hình */
   getPatience?: () => number
+  /** Có thì vẽ sạp kệ hàng nông sản giữa đồng quê thay cho tiệm phố */
+  market?: MarketSlot[]
 }
 
 /** failed: máy không dựng được cảnh, dùng hình tĩnh; gone: cảnh đã bị hủy */
@@ -28,11 +30,13 @@ type Loaded = Street | 'failed' | 'gone'
 const walkers = CUSTOMERS.map((c) => ({ image: c.image, emoji: c.emoji }))
 
 /** Cảnh phố trước tiệm (PixiJS, tải riêng để không làm chậm lúc mở app) */
-export default forwardRef<StreetHandle, Props>(function StreetScene({ mode, level, owned, opening, getPatience }, ref) {
+export default forwardRef<StreetHandle, Props>(function StreetScene({ mode, level, owned, opening, getPatience, market }, ref) {
   const host = useRef<HTMLDivElement>(null)
   const street = useRef<Promise<Loaded>>(Promise.resolve('gone'))
   const patience = useRef(getPatience)
   patience.current = getPatience
+  const goods = useRef(market)
+  goods.current = market
   const [failed, setFailed] = useState(false)
   const ownedKey = owned.join(',')
 
@@ -47,7 +51,8 @@ export default forwardRef<StreetHandle, Props>(function StreetScene({ mode, leve
         if (cancelled) return 'gone' as const
         created = new Street(host.current!, {
           mode,
-          shop: { image: level.image, ratio: level.ratio, decor },
+          shop: goods.current ? undefined : { image: level.image, ratio: level.ratio, decor },
+          market: goods.current,
           walkers,
           opening,
           getPatience: () => patience.current?.() ?? 1,
@@ -72,6 +77,12 @@ export default forwardRef<StreetHandle, Props>(function StreetScene({ mode, leve
     }
   }, [mode, level.image, ownedKey])
 
+  // Bán bớt hàng: kệ vơi đi
+  const goodsKey = market?.map((g) => `${g.emoji}${g.count}`).join(',')
+  useEffect(() => {
+    if (market) void street.current.then((s) => typeof s === 'object' && s.setGoods(market))
+  }, [goodsKey])
+
   useImperativeHandle(
     ref,
     () => ({
@@ -88,11 +99,20 @@ export default forwardRef<StreetHandle, Props>(function StreetScene({ mode, leve
 
   return (
     <div className={`street ${mode}`} ref={host}>
-      {failed && (
-        <div className="street-fallback">
-          <ShopDecor level={level} owned={owned} />
-        </div>
-      )}
+      {failed &&
+        (market ? (
+          <div className="street-fallback market-fallback">
+            {market.map((g) => (
+              <span key={g.emoji}>
+                {g.emoji} ×{g.count}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="street-fallback">
+            <ShopDecor level={level} owned={owned} />
+          </div>
+        ))}
     </div>
   )
 })

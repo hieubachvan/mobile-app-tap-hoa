@@ -3,6 +3,7 @@ import { sfx } from '../game/sound'
 import { SHOP_LEVELS } from '../game/shopLevels'
 import ShopDecor from '../components/ShopDecor'
 import ShopSign from '../components/ShopSign'
+import { warn } from '../components/Warning'
 
 const AGES = [3, 4, 5, 6, 7, 8, 9, 10]
 
@@ -15,7 +16,7 @@ export default function Welcome({ onStart }: { onStart: (name: string, age: numb
     <div className="app welcome">
       <ShopSign name={name} big />
       <ShopDecor level={SHOP_LEVELS[0]} owned={[]} />
-      <p className="welcome-text">Chào bé! Hôm nay bé làm chủ tiệm, bán hàng và tính tiền cho khách nhé!</p>
+      <p className="welcome-text">Chào bé! Hôm nay bé làm chủ nông trại: trồng cây, bán nông sản và tính tiền cho khách nhé!</p>
 
       <label className="field">
         <span>Bé tên là gì?</span>
@@ -40,8 +41,15 @@ export default function Welcome({ onStart }: { onStart: (name: string, age: numb
         </div>
       </div>
 
-      <button className="btn btn-primary btn-xl" disabled={!ready} onClick={() => ready && onStart(name.trim(), age!)}>
-        Mở tiệm thôi! 🚀
+      <button
+        className={`btn btn-primary btn-xl ${ready ? '' : 'locked'}`}
+        onClick={() => {
+          if (!name.trim()) return warn('Nhập tên của bé trước nhé!')
+          if (age === null) return warn('Chọn tuổi của bé trước nhé!')
+          onStart(name.trim(), age)
+        }}
+      >
+        Vào nông trại thôi! 🚀
       </button>
     </div>
   )

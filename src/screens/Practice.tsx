@@ -16,7 +16,7 @@ export default function Practice({ rewardLeft, onPlay, onExit }: Props) {
   return (
     <div className="screen">
       <header className="topbar">
-        <button className="icon-btn" onClick={onExit} aria-label="Về tiệm">
+        <button className="icon-btn" onClick={onExit} aria-label="Về nông trại">
           ⬅️
         </button>
         <h1 className="screen-title">🎯 Luyện riêng</h1>

@@ -1,4 +1,4 @@
-import { Application, Assets, Container, Graphics, Sprite, Text, Texture } from 'pixi.js'
+import { Application, Assets, Container, Graphics, Sprite, Text, Texture, type FederatedPointerEvent } from 'pixi.js'
 import { sfx } from '../game/sound'
 
 export interface Figure {
@@ -27,10 +27,20 @@ export interface SceneShop {
   decor: SceneDecor[]
 }
 
+/** Một loại hàng trên kệ sạp chợ */
+export interface MarketSlot {
+  emoji: string
+  count: number
+  price: number
+}
+
 export interface StreetOptions {
   /** home: tiệm mở sẵn, người qua đường ghé mua; shop: có khách vào quầy */
   mode: 'home' | 'shop'
-  shop: SceneShop
+  /** Mặt tiền tiệm phố; bỏ trống khi dùng sạp chợ */
+  shop?: SceneShop
+  /** Sạp kệ hàng nông sản giữa đồng quê thay cho tiệm phố */
+  market?: MarketSlot[]
   /** Người qua đường (dùng lại hình khách) */
   walkers: Figure[]
   /** Kéo cửa cuốn lên rồi mới đón khách */
@@ -46,6 +56,8 @@ const SIDEWALK = 40
 /** Thú cưng emoji mặc định quay mặt sang trái */
 const ANIMALS: Figure[] = [{ emoji: '🐕' }, { emoji: '🐈' }]
 const BUILDING_COLORS = [0xffe3c2, 0xd7ecff, 0xffd6e0, 0xe2f5d3, 0xfff1b8]
+/** Sạp chợ: tỉ lệ ngang/cao của khung sạp */
+const STALL_RATIO = 1.25
 /** Hình nhân vật xuất cùng tỉ lệ, người cao nhất cao chừng này px: hình thấp hơn thì vẽ thấp hơn tương ứng */
 const CHARACTER_PX = 320
 
@@ -185,6 +197,9 @@ export class Street {
   private fxLayer = new Container()
 
   private shopSprite?: Sprite
+  /** Sạp chợ: khung gỗ vẽ lại theo cỡ khung, hàng trên kệ vẽ lại khi bán bớt */
+  private stall = new Graphics()
+  private stallGoods = new Container()
   private shopRect = { x: 0, y: 0, w: 0, h: 0 }
   private decor: DecorNode[] = []
   private shutterP = 0
@@ -286,6 +301,12 @@ export class Street {
     }
   }
 
+  /** Sạp chợ: cập nhật số hàng còn trên kệ */
+  setGoods(goods: MarketSlot[]) {
+    this.opts.market = goods
+    if (this.inited && this.W) this.drawGoods()
+  }
+
   destroy() {
     if (!this.alive) return
     this.alive = false
@@ -306,7 +327,7 @@ export class Street {
       autoDensity: true,
       preference: ['webgl', 'canvas'],
     })
-    await Assets.load([opts.shop.image, ...opts.walkers.flatMap((w) => (w.image ? [w.image] : []))])
+    await Assets.load([...(opts.shop ? [opts.shop.image] : []), ...opts.walkers.flatMap((w) => (w.image ? [w.image] : []))])
     this.inited = true
     if (!this.alive) {
       this.app.destroy({ removeView: true }, { children: true })
@@ -339,18 +360,25 @@ export class Street {
       this.clouds.push({ g, speed: rand(4, 9) })
     }
 
-    const shop = new Sprite(Texture.from(opts.shop.image))
-    shop.anchor.set(0.5, 1)
-    shop.eventMode = 'static'
-    shop.on('pointertap', (e) => {
+    const tapShop = (e: FederatedPointerEvent) => {
       const p = e.getLocalPosition(this.fxLayer)
       this.sparkle(p.x, p.y, 6)
       sfx.pop()
-    })
-    this.shopSprite = shop
-    this.shopLayer.addChild(shop)
+    }
+    if (opts.shop) {
+      const shop = new Sprite(Texture.from(opts.shop.image))
+      shop.anchor.set(0.5, 1)
+      shop.eventMode = 'static'
+      shop.on('pointertap', tapShop)
+      this.shopSprite = shop
+      this.shopLayer.addChild(shop)
+    } else {
+      this.stall.eventMode = 'static'
+      this.stall.on('pointertap', tapShop)
+      this.shopLayer.addChild(this.stall, this.stallGoods)
+    }
 
-    opts.shop.decor.forEach((d, i) => {
+    opts.shop?.decor.forEach((d, i) => {
       const node = new Text({ text: d.emoji, style: { fontFamily: EMOJI_FONT, fontSize: 20 } })
       node.anchor.set(0.5)
       node.eventMode = 'static'
@@ -388,9 +416,11 @@ export class Street {
     this.frontY = H - 3
     this.gh = Math.min(H * 0.64, 156)
 
-    // Nhà phố phía sau
+    const market = !this.opts.shop
+    // Phía sau: đồng quê cho sạp chợ, dãy nhà phố cho tiệm
     const town = this.town.clear()
-    for (let x = -10, k = 0; x < W; k++) {
+    if (market) this.drawCountry(W, top)
+    else for (let x = -10, k = 0; x < W; k++) {
       const bw = 50 + ((k * 37) % 40)
       const bh = top * (0.35 + ((k * 53) % 30) / 100)
       town.rect(x, top - bh, bw - 4, bh).fill(BUILDING_COLORS[k % BUILDING_COLORS.length])
@@ -400,7 +430,7 @@ export class Street {
     }
 
     // Mặt tiền: cao vừa khung, chừa chỗ bên phải cho khách đứng quầy
-    const { ratio } = this.opts.shop
+    const ratio = this.opts.shop?.ratio ?? STALL_RATIO
     let h = top - 6
     let w = h * ratio
     const maxW = W * (this.opts.mode === 'shop' ? 0.8 : 0.94)
@@ -409,11 +439,16 @@ export class Street {
       h = w / ratio
     }
     const cx = this.opts.mode === 'shop' ? Math.max(w / 2 + 6, (W - 60) / 2) : W / 2
-    const shop = this.shopSprite!
-    shop.width = w
-    shop.height = h
-    shop.position.set(cx, top + 4)
     this.shopRect = { x: cx - w / 2, y: top + 4 - h, w, h }
+    const shop = this.shopSprite
+    if (shop) {
+      shop.width = w
+      shop.height = h
+      shop.position.set(cx, top + 4)
+    } else {
+      this.drawStall()
+      this.drawGoods()
+    }
 
     for (const it of this.decor) {
       it.node.style.fontSize = Math.max(10, (it.d.size / 100) * w)
@@ -423,10 +458,17 @@ export class Street {
 
     // Vỉa hè và bóng tiệm
     const ground = this.ground.clear()
-    ground.rect(0, top, W, SIDEWALK).fill(0xe6c79c)
-    ground.rect(0, top, W, 3).fill(0xc9a275)
-    for (let x = 14; x < W; x += 30) ground.rect(x, top + 3, 2, SIDEWALK).fill({ color: 0xc9a275, alpha: 0.45 })
-    ground.rect(0, top + SIDEWALK / 2, W, 1.5).fill({ color: 0xc9a275, alpha: 0.35 })
+    if (market) {
+      // Đường đất có cỏ hai bên
+      ground.rect(0, top, W, SIDEWALK).fill(0xd9b98a)
+      ground.rect(0, top, W, 4).fill(0x7cb85a)
+      for (let x = 8; x < W; x += 26) ground.ellipse(x + ((x * 7) % 11), top + 12 + ((x * 13) % 17), 4, 2).fill({ color: 0xb8925f, alpha: 0.6 })
+    } else {
+      ground.rect(0, top, W, SIDEWALK).fill(0xe6c79c)
+      ground.rect(0, top, W, 3).fill(0xc9a275)
+      for (let x = 14; x < W; x += 30) ground.rect(x, top + 3, 2, SIDEWALK).fill({ color: 0xc9a275, alpha: 0.45 })
+      ground.rect(0, top + SIDEWALK / 2, W, 1.5).fill({ color: 0xc9a275, alpha: 0.35 })
+    }
     ground.ellipse(cx, top + 5, w * 0.48, 6).fill({ color: 0x5a3a1a, alpha: 0.18 })
 
     this.drawShutter()
@@ -742,6 +784,141 @@ export class Street {
     for (let sy = y + 7; sy < y + h - 4; sy += 8) g.rect(x, sy, w, 1.5).fill(0x8b96a8)
     g.rect(x - 2, y + h - 6, w + 4, 6).fill(0x6b7586)
     g.roundRect(x + w / 2 - 10, y + h - 12, 20, 5, 2).fill(0x4f5866)
+  }
+
+  /** Phía sau sạp chợ: đồi, ruộng luống, nhà kho, cây và hàng rào */
+  private drawCountry(W: number, top: number) {
+    const g = this.town
+    g.ellipse(W * 0.2, top + 10, W * 0.5, top * 0.6).fill(0xb9e4a0)
+    g.ellipse(W * 0.85, top + 14, W * 0.55, top * 0.5).fill(0xa5d98a)
+    const fy = top - top * 0.24
+    g.rect(0, fy, W, top - fy).fill(0x9ccc65)
+    for (let y = fy + 5, i = 0; y < top - 2; y += 8, i++) g.rect(0, y, W, 4).fill(i % 2 ? 0x8bc34a : 0x7cb342)
+    const bx = W * 0.06
+    const bw = 44
+    const bh = 32
+    g.rect(bx, fy - bh, bw, bh).fill(0xd84d3f)
+    g.poly([bx - 4, fy - bh, bx + bw / 2, fy - bh - 20, bx + bw + 4, fy - bh]).fill(0x8d3a2f)
+    g.rect(bx + bw / 2 - 8, fy - 18, 16, 18).fill(0xfff3d6)
+    for (const [x, s] of [
+      [W * 0.3, 1],
+      [W * 0.62, 0.8],
+      [W * 0.93, 1.1],
+    ]) {
+      g.rect(x - 3 * s, fy - 24 * s, 6 * s, 24 * s).fill(0x8b5a2b)
+      g.circle(x, fy - 36 * s, 17 * s).fill(0x5fa043)
+      g.circle(x - 9 * s, fy - 28 * s, 11 * s).fill(0x6fb24f)
+    }
+    for (let x = 4; x < W; x += 18) g.rect(x, top - 16, 4, 16).fill(0xc48a52)
+    g.rect(0, top - 12, W, 3).fill(0xc48a52)
+    g.rect(0, top - 6, W, 3).fill(0xc48a52)
+  }
+
+  /** Hai tầng kệ (đáy hàng) trong khung sạp */
+  private shelfYs() {
+    const { y, h } = this.shopRect
+    return [y + h * 0.5, y + h * 0.79]
+  }
+
+  /** Khung sạp gỗ: cột, vách sau, kệ, quầy, mái bạt sọc */
+  private drawStall() {
+    const { x, y, w, h } = this.shopRect
+    const g = this.stall.clear()
+    const awn = h * 0.2
+    g.rect(x + w * 0.04, y + awn * 0.5, w * 0.045, h - awn * 0.5).fill(0x8b5a2b)
+    g.rect(x + w * 0.915, y + awn * 0.5, w * 0.045, h - awn * 0.5).fill(0x8b5a2b)
+    g.rect(x + w * 0.085, y + awn, w * 0.83, h * 0.6).fill(0xf3dcb0)
+    for (let px = x + w * 0.085 + 18; px < x + w * 0.9; px += 18) g.rect(px, y + awn, 1.5, h * 0.6).fill({ color: 0xd9b98a, alpha: 0.7 })
+    for (const sy of this.shelfYs()) {
+      g.rect(x + w * 0.07, sy, w * 0.86, Math.max(5, h * 0.03)).fill(0xa86b37)
+      g.rect(x + w * 0.07, sy + Math.max(5, h * 0.03), w * 0.86, 2).fill({ color: 0x5d3a1a, alpha: 0.3 })
+    }
+    const cy = y + h * 0.82
+    g.rect(x + w * 0.02, cy, w * 0.96, h * 0.18).fill(0xc98d52)
+    g.rect(x + w * 0.01, cy - 4, w * 0.98, 7).fill(0x9c6b3f)
+    for (let px = x + w * 0.02 + w * 0.12; px < x + w * 0.97; px += w * 0.12) g.rect(px, cy + 3, 2, h * 0.18 - 3).fill({ color: 0x8b5a2b, alpha: 0.5 })
+    // Mái bạt sọc đỏ trắng, mép dưới lượn sóng
+    const n = 8
+    const sw = (w * 1.02) / n
+    for (let i = 0; i < n; i++) {
+      const sx = x - w * 0.01 + i * sw
+      const color = i % 2 ? 0xffffff : 0xe8473b
+      g.rect(sx, y, sw, awn * 0.8).fill(color)
+      g.circle(sx + sw / 2, y + awn * 0.8, sw / 2).fill(color)
+    }
+    g.rect(x - w * 0.02, y - 4, w * 1.04, 8).fill(0xb33a2e)
+  }
+
+  /** Hàng trên kệ: mỗi loại một sọt, chất đống theo số còn lại, có thẻ giá */
+  private drawGoods() {
+    for (const c of this.stallGoods.removeChildren()) c.destroy({ children: true })
+    const slots = this.opts.market ?? []
+    const { x, y, w, h } = this.shopRect
+    const rows = slots.length > 3 ? 2 : 1
+    const cols = Math.max(1, Math.ceil(slots.length / rows))
+    const [b1, b2] = this.shelfYs()
+    const bases = rows === 2 ? [b1, b2] : [b2]
+    const innerX = x + w * 0.1
+    const slotW = (w * 0.8) / cols
+    const size = Math.min(slotW * 0.27, h * 0.11)
+    const label = (text: string, fontSize: number, fill: number) =>
+      new Text({ text, style: { fontFamily: TEXT_FONT, fontSize, fontWeight: '800', fill }, resolution: 2 })
+    const plank = Math.max(5, h * 0.03)
+    // Thẻ giá vẽ sau cùng để hàng tầng dưới không che
+    const tags = new Container()
+
+    slots.forEach((s, i) => {
+      const base = bases[Math.floor(i / cols)]
+      const cx = innerX + slotW * ((i % cols) + 0.5)
+      const g = new Graphics()
+      const crateW = slotW * 0.78
+      const crateH = size * 0.55
+      g.roundRect(cx - crateW / 2, base - crateH, crateW, crateH, 4).fill(s.count ? 0xb98352 : 0xd9c3a0)
+      g.rect(cx - crateW / 2, base - crateH * 0.55, crateW, 2).fill({ color: 0x8b5a2b, alpha: 0.6 })
+      this.stallGoods.addChild(g)
+      // Đống hàng: hàng dưới 3, trên 2
+      const shown = Math.min(s.count, 5)
+      const spots = [
+        [-1, 0], [0, 0], [1, 0], [-0.5, 1], [0.5, 1],
+      ].slice(0, shown)
+      for (const [dx, row] of spots) {
+        const t = new Text({ text: s.emoji, style: { fontFamily: EMOJI_FONT, fontSize: size }, resolution: 2 })
+        t.anchor.set(0.5, 1)
+        t.position.set(cx + dx * size * 0.62, base - crateH * 0.45 - row * size * 0.55)
+        this.stallGoods.addChild(t)
+      }
+      if (!s.count) {
+        const out = label('Hết', Math.max(10, size * 0.42), 0x8a7460)
+        out.anchor.set(0.5, 1)
+        out.position.set(cx, base - crateH - 2)
+        this.stallGoods.addChild(out)
+      } else {
+        const badge = label(`×${s.count}`, Math.max(10, size * 0.4), 0x3b2a1a)
+        badge.anchor.set(0.5)
+        const bx = cx + crateW / 2 - 4
+        const by = base - crateH - size * 0.9
+        const bw = badge.width + 8
+        this.stallGoods.addChild(new Graphics().roundRect(bx - bw / 2, by - 9, bw, 18, 9).fill(0xffffff).stroke({ width: 1.5, color: 0xd9b98a }), badge)
+        badge.position.set(bx, by)
+      }
+      // Thẻ giá dán trên mép kệ, ngay dưới sọt
+      const price = label(`${s.price} xu`, Math.max(10, size * 0.42), 0x3b2a1a)
+      price.anchor.set(0.5)
+      const pw = price.width + 10
+      const py = base + plank / 2
+      tags.addChild(new Graphics().roundRect(cx - pw / 2, py - 9, pw, 18, 5).fill(0xffd54f).stroke({ width: 1.5, color: 0xd99400 }), price)
+      price.position.set(cx, py)
+    })
+    this.stallGoods.addChild(tags)
+
+    const sign = new Text({
+      text: '🌾 Nông sản nhà trồng',
+      style: { fontFamily: TEXT_FONT, fontSize: Math.max(11, h * 0.065), fontWeight: '800', fill: 0xfff3d6, stroke: { color: 0x8b5a2b, width: 3 } },
+      resolution: 2,
+    })
+    sign.anchor.set(0.5)
+    sign.position.set(x + w / 2, y + h * 0.91)
+    this.stallGoods.addChild(sign)
   }
 
   private sparkle(x: number, y: number, n: number) {

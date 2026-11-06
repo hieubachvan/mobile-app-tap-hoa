@@ -26,7 +26,7 @@ const KINDS: { kind: Kind; label: string }[] = [
   { kind: 'total', label: 'Tính tổng tiền' },
   { kind: 'change', label: 'Thối tiền' },
   { kind: 'multiply', label: 'Nhân (số lượng × giá)' },
-  { kind: 'divide', label: 'Tìm giá 1 món (chia)' },
+  { kind: 'divide', label: 'Đưa tiền, mua được mấy món (chia)' },
   { kind: 'share', label: 'Chia đều' },
   { kind: 'group', label: 'Đóng túi' },
   { kind: 'remainder', label: 'Chia có dư' },
@@ -49,7 +49,6 @@ function problems(t: Tuning): string[] {
   }
   walk(t, '')
   t.tiers.forEach((tier) => {
-    if (tier.price[0] > tier.price[1]) out.push(`Cấp ${tier.id}: giá thấp nhất lớn hơn giá cao nhất`)
     if (tier.kinds.length === 0) out.push(`Cấp ${tier.id}: chưa chọn loại câu hỏi nào`)
     if (tier.questions < 1) out.push(`Cấp ${tier.id}: số câu mỗi ngày phải từ 1`)
   })
@@ -177,9 +176,7 @@ function TierCard({ tier, set }: { tier: Tier; set: (path: Path, v: unknown) => 
 
       <h4>Giá và số lượng</h4>
       <div className="grid">
-        <Num label="Giá thấp nhất" value={tier.price[0]} onChange={(v) => set(['price', 0], v)} />
-        <Num label="Giá cao nhất" value={tier.price[1]} onChange={(v) => set(['price', 1], v)} />
-        <Num label="Bước giá" hint="Giá luôn chia hết cho số này" value={tier.priceStep} onChange={f('priceStep')} min={1} />
+        <Num label="Hệ số giá" hint="Giá trên bảng = giá gốc nông sản × số này" value={tier.priceScale} onChange={f('priceScale')} min={1} />
         <Num label="Số loại hàng tối đa / lượt" value={tier.maxTypes} onChange={f('maxTypes')} min={1} />
         <Num label="Số lượng tối đa mỗi loại" hint="Khi tính tổng tiền" value={tier.qtyMax} onChange={f('qtyMax')} min={1} />
         <Num label="Đếm tối đa" hint="Câu đếm hàng" value={tier.countMax} onChange={f('countMax')} min={1} />
@@ -200,8 +197,6 @@ function TierCard({ tier, set }: { tier: Tier; set: (path: Path, v: unknown) => 
       <h4>Nhân, chia</h4>
       <div className="grid">
         <Num label="Số lượng tối đa (nhân)" value={tier.mulQty} onChange={f('mulQty')} min={1} />
-        <Num label="Giá tối đa (nhân)" value={tier.mulPrice} onChange={f('mulPrice')} min={1} />
-        <Num label="Số chia tối đa (tìm giá)" value={tier.divMax} onChange={f('divMax')} min={1} />
         <Num label="Số túi tối đa (chia đều)" value={tier.shareDiv} onChange={f('shareDiv')} min={1} />
         <Num label="Số món mỗi túi tối đa" value={tier.shareQuot} onChange={f('shareQuot')} min={1} />
         <Field label="Viết số lượng">
@@ -369,6 +364,7 @@ export default function ConfigApp() {
           <a href="#coins">Xu</a>
           <a href="#quests">Nhiệm vụ</a>
           <a href="#shop">Tiệm</a>
+          <a href="#farm">Nông trại</a>
           <a href="#customers">Khách</a>
         </nav>
         <div className="actions">
@@ -403,7 +399,36 @@ export default function ConfigApp() {
 
       <Section id="day" title="Ngày bán hàng" desc="Áp dụng cho mọi cấp. Số câu mỗi ngày đặt riêng từng cấp ở phần Cấp độ.">
         <div className="grid">
-          <Num label="Số ngày để lên cấp" value={t.day.daysPerTier} onChange={set(['day', 'daysPerTier'])} min={1} />
+          <Num label="Số ngày tiến bộ để lên cấp" value={t.day.daysPerTier} onChange={set(['day', 'daysPerTier'])} min={1} />
+          <Num
+            label="Số sao để tính là ngày tiến bộ"
+            hint="Ít sao hơn vẫn sang ngày mới nhưng không tiến gần lên cấp"
+            value={t.day.starsToAdvance}
+            onChange={set(['day', 'starsToAdvance'])}
+            min={1}
+          />
+          <Num
+            label="Số ngày liền 3 sao để lên nhanh"
+            hint="Đủ thì tính thêm 1 ngày tiến bộ"
+            value={t.day.fastTrackDays}
+            onChange={set(['day', 'fastTrackDays'])}
+            min={1}
+          />
+          <Num
+            label="Số ngày liền 0 sao để ôn lại"
+            hint="Đủ thì tạm hạ 1 cấp tới khi bé đạt lại từ 1 sao"
+            value={t.day.slumpDays}
+            onChange={set(['day', 'slumpDays'])}
+            min={1}
+          />
+          <Num
+            label="Qua cấp cuối: số to thêm mỗi bậc"
+            hint="Vd 1.25 = giá và phạm vi số nhân 1,25 lần mỗi bậc"
+            value={t.day.beyondGrowth}
+            onChange={set(['day', 'beyondGrowth'])}
+            step={0.05}
+          />
+          <Num label="Số bậc tối đa sau cấp cuối" value={t.day.beyondLevels} onChange={set(['day', 'beyondLevels'])} />
           <Num label="Số câu mỗi lượt Luyện riêng" value={t.day.practiceQuestions} onChange={set(['day', 'practiceQuestions'])} min={1} />
           <Num
             label="Giây chờ thêm khi khách vừa tới"
@@ -473,6 +498,13 @@ export default function ConfigApp() {
             onChange={set(['coins', 'rewardRunsPerDay'])}
           />
           <Num label="Rương xong 3 nhiệm vụ" value={t.coins.chest} onChange={set(['coins', 'chest'])} />
+          <Num
+            label="Trả lời sai bị trừ (xu)"
+            hint="Trừ vào tiền lời của lượt đang chơi, không xuống dưới 0. 0 = không trừ"
+            value={t.coins.mistakeCost}
+            onChange={set(['coins', 'mistakeCost'])}
+          />
+          <Num label="Bé từ tuổi này mới bị trừ" value={t.coins.mistakeFromAge} onChange={set(['coins', 'mistakeFromAge'])} min={3} />
         </div>
         <h4>Quà điểm danh 7 ngày</h4>
         <div className="grid seven">
@@ -574,6 +606,129 @@ export default function ConfigApp() {
                 </td>
                 <td>
                   <input type="number" value={u.customers} onChange={(e) => set(['upgrades', i, 'customers'])(toNum(e.target.value))} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Section>
+
+      <Section
+        id="farm"
+        title="Nông trại"
+        desc="Mỗi lần mở cửa bán hàng, mỗi cây được bón thêm 1 lần. Cây chín cho nông sản; khách ở tiệm mua nông sản thì bé được thêm xu mỗi món."
+      >
+        <div className="grid">
+          <Num label="Ít nhất bấy nhiêu món trên kệ mới mở sạp" value={t.farm.minShelf} onChange={set(['farm', 'minShelf'])} min={1} />
+          {t.farm.crops.map((c) => (
+            <Num
+              key={c.id}
+              label={`Có sẵn khi mới chơi: ${c.name}`}
+              value={t.farm.starter[c.id] ?? 0}
+              onChange={set(['farm', 'starter', c.id])}
+            />
+          ))}
+        </div>
+        <h4>Ao cá</h4>
+        <div className="grid">
+          <Num label="Giá đào ao (xu)" value={t.farm.pond.cost} onChange={set(['farm', 'pond', 'cost'])} />
+          <Num label="Số giây một lượt câu" value={t.farm.pond.seconds} onChange={set(['farm', 'pond', 'seconds'])} min={10} />
+          <Num label="Xô đựng tối đa (con mỗi lượt)" value={t.farm.pond.bucket} onChange={set(['farm', 'pond', 'bucket'])} min={1} />
+          <Num label="Sai / hết giờ bấy nhiêu lần thì cá sổng" value={t.farm.pond.misses} onChange={set(['farm', 'pond', 'misses'])} min={1} />
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Loại cá</th>
+              <th>Số con trong ao</th>
+              <th>Số phép khi vùng vẫy</th>
+              <th>Giây mỗi phép</th>
+              <th>Độ khó (± cấp)</th>
+              <th>Giá gốc</th>
+              <th>Xu lời mỗi con</th>
+            </tr>
+          </thead>
+          <tbody>
+            {t.farm.pond.fish.map((f, i) => (
+              <tr key={f.id}>
+                <td>{f.name}</td>
+                {(['count', 'questions', 'seconds', 'tierShift', 'price', 'bonus'] as const).map((k) => (
+                  <td key={k}>
+                    <input
+                      type="number"
+                      value={f[k]}
+                      min={k === 'tierShift' ? -5 : k === 'bonus' ? 0 : 1}
+                      onChange={(e) => set(['farm', 'pond', 'fish', i, k])(toNum(e.target.value))}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <h4>Cỡ ruộng theo từng lần mở rộng</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Lần</th>
+              <th>Số cột</th>
+              <th>Số hàng</th>
+              <th>Giá (xu)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {t.farm.fields.map((f, i) => (
+              <tr key={i}>
+                <td>{i === 0 ? 'Có sẵn' : `Mở rộng ${i}`}</td>
+                <td>
+                  <input type="number" min={1} value={f.cols} onChange={(e) => set(['farm', 'fields', i, 'cols'])(toNum(e.target.value))} />
+                </td>
+                <td>
+                  <input type="number" min={1} value={f.rows} onChange={(e) => set(['farm', 'fields', i, 'rows'])(toNum(e.target.value))} />
+                </td>
+                <td>
+                  <input type="number" value={f.cost} disabled={i === 0} onChange={(e) => set(['farm', 'fields', i, 'cost'])(toNum(e.target.value))} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <h4>Cây trồng (tính cho mỗi ô)</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Tên</th>
+              <th>Mở từ ngày</th>
+              <th>Giá 1 lần bón (xu)</th>
+              <th>Số lần bón</th>
+              <th>Thu được</th>
+              <th>Giá gốc trên bảng (xu)</th>
+              <th>Lời thêm xu/món</th>
+            </tr>
+          </thead>
+          <tbody>
+            {t.farm.crops.map((c, i) => (
+              <tr key={c.id}>
+                <td>
+                  <input value={c.name} onChange={(e) => set(['farm', 'crops', i, 'name'])(e.target.value)} />
+                </td>
+                <td>
+                  <input type="number" min={1} value={c.unlockDay} onChange={(e) => set(['farm', 'crops', i, 'unlockDay'])(toNum(e.target.value))} />
+                </td>
+                <td>
+                  <input type="number" value={c.fertilizer} onChange={(e) => set(['farm', 'crops', i, 'fertilizer'])(toNum(e.target.value))} />
+                </td>
+                <td>
+                  <input type="number" min={1} value={c.feeds} onChange={(e) => set(['farm', 'crops', i, 'feeds'])(toNum(e.target.value))} />
+                </td>
+                <td>
+                  <input type="number" min={1} value={c.harvest} onChange={(e) => set(['farm', 'crops', i, 'harvest'])(toNum(e.target.value))} />
+                </td>
+                <td>
+                  <input type="number" min={1} value={c.price} onChange={(e) => set(['farm', 'crops', i, 'price'])(toNum(e.target.value))} />
+                </td>
+                <td>
+                  <input type="number" value={c.bonus} onChange={(e) => set(['farm', 'crops', i, 'bonus'])(toNum(e.target.value))} />
                 </td>
               </tr>
             ))}

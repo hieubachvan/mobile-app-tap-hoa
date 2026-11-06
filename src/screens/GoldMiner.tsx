@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { callName, type Profile } from '../game/storage'
 import { REWARD_RUNS_PER_DAY } from '../game/daily'
-import { OPS, tierFor, type Op } from '../game/levels'
+import { warn } from '../components/Warning'
+import { OPS, levelOf, type Op } from '../game/levels'
 import { exprToSpeech, genDrill, type Drill } from '../game/questions'
 import { distractors, rand, shuffle } from '../game/random'
 import { sfx, speak } from '../game/sound'
@@ -24,6 +25,10 @@ const PIVOT = { x: W / 2, y: GROUND - 6 }
 const ROPE_MIN = 26
 const GAME_TIME = TUNING.coins.goldSeconds
 const COINS_PER_CORRECT = TUNING.coins.goldPerCorrect
+
+/** Xu nhận được: gắp đúng được thưởng, gắp sai bị trừ (`fine` xu mỗi lần), không xuống dưới 0 */
+const coinsOf = (s: { correct: number; tries: number }, fine: number) =>
+  Math.max(0, s.correct * COINS_PER_CORRECT - (s.tries - s.correct) * fine)
 
 type NuggetKind = 'gold' | 'rock' | 'diamond'
 
@@ -105,7 +110,9 @@ function newGame(tierId: number, rewarded: boolean, op?: Op): GameState {
 }
 
 export default function GoldMiner({ profile, practice, rewardLeft, onFinish, onExit }: Props) {
-  const [tierId] = useState(() => tierFor(profile.age, profile.day).id)
+  const [tierId] = useState(() => levelOf(profile))
+  /** Bé nhỏ tuổi không bị trừ xu khi gắp sai */
+  const [fine] = useState(() => (profile.age >= TUNING.coins.mistakeFromAge ? TUNING.coins.mistakeCost : 0))
   const g = useRef<GameState>(newGame(tierId, rewardLeft > 0, practice ?? undefined))
   const [, setFrame] = useState(0)
   const [round, setRound] = useState(0)
@@ -116,6 +123,10 @@ export default function GoldMiner({ profile, practice, rewardLeft, onFinish, onE
   useEffect(() => {
     speak(exprToSpeech(g.current.drill.expr))
   }, [round])
+
+  useEffect(() => {
+    if (rewardLeft <= 0) warn('Hôm nay hết lượt nhận xu ở Đào mỏ rồi. Vẫn chơi được để luyện tập nhưng không được cộng xu nhé!')
+  }, [])
 
   useEffect(() => {
     let raf = 0
@@ -134,7 +145,7 @@ export default function GoldMiner({ profile, practice, rewardLeft, onFinish, onE
         speak(`Đúng rồi! ${exprToSpeech(s.drill.expr)}`)
       } else {
         sfx.wrong()
-        s.pops.push({ id: uid++, x: PIVOT.x, y: GROUND - 40, text: `${n.value} chưa đúng ✗`, good: false, age: 0 })
+        s.pops.push({ id: uid++, x: PIVOT.x, y: GROUND - 40, text: `${n.value} chưa đúng ✗${fine && s.rewarded ? ` −${fine} xu` : ''}`, good: false, age: 0 })
         if (s.nuggets.length < 3) s.nuggets = makeField(s.drill)
       }
     }
@@ -150,7 +161,7 @@ export default function GoldMiner({ profile, practice, rewardLeft, onFinish, onE
           s.timeLeft = 0
           s.over = true
           sfx.win()
-          finishRef.current(s.correct, s.correct * COINS_PER_CORRECT)
+          finishRef.current(s.correct, coinsOf(s, fine))
           speak(`Hết giờ! ${nameRef.current} gắp đúng ${s.correct} lần!`)
         }
 
@@ -215,7 +226,7 @@ export default function GoldMiner({ profile, practice, rewardLeft, onFinish, onE
   return (
     <div className="screen gold-screen">
       <header className="topbar">
-        <button className="icon-btn" onClick={onExit} aria-label="Về tiệm">
+        <button className="icon-btn" onClick={onExit} aria-label="Về nông trại">
           ⬅️
         </button>
         <div className="chip">⏱️ {Math.ceil(s.timeLeft)}s</div>
@@ -308,7 +319,8 @@ export default function GoldMiner({ profile, practice, rewardLeft, onFinish, onE
               <br />
               {s.rewarded ? (
                 <>
-                  Thưởng: <b>🪙 {s.correct * COINS_PER_CORRECT} xu</b>
+                  Thưởng: <b>🪙 {coinsOf(s, fine)} xu</b>
+                  {fine > 0 && s.tries > s.correct && <> (gắp sai bị trừ {(s.tries - s.correct) * fine} xu)</>}
                 </>
               ) : (
                 <>Hết lượt nhận xu hôm nay, mai quay lại nhé! Kỷ lục vẫn được tính.</>
@@ -318,7 +330,7 @@ export default function GoldMiner({ profile, practice, rewardLeft, onFinish, onE
               🔁 Chơi lại
             </button>
             <button className="btn btn-primary btn-xl" onClick={onExit}>
-              🏪 Về tiệm
+              🌾 Về nông trại
             </button>
           </div>
         </div>

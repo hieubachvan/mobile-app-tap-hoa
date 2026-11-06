@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { callName, type Profile } from '../game/storage'
-import { agePatienceFactor, practiceTier, tierFor, type Op } from '../game/levels'
-import { itemsFor } from '../game/items'
+import { agePatienceFactor, practiceTier, tierOf, type Op } from '../game/levels'
+import { cropOf, isRipe, marketPrices, practiceGoods, produceBonus, produceIn, shelfGoods } from '../game/farm'
 import { shopLevel } from '../game/shopLevels'
 import StreetScene, { type StreetHandle } from '../components/StreetScene'
 import { PERFECT_BONUS, PROFIT_PER_CUSTOMER, coinBonus, extraCustomers, patienceBonus } from '../game/upgrades'
-import { CURRENCY, NO_PRICE_KINDS, genVisit, makeChoices } from '../game/questions'
+import { CURRENCY, NO_PRICE_KINDS, genVisit, makeChoices, type Visit } from '../game/questions'
 import { sfx, speak } from '../game/sound'
 import { TUNING } from '../game/tuning'
 import AnswerInput from '../components/AnswerInput'
 import HintDots from '../components/HintDots'
+import { warn } from '../components/Warning'
 
 export interface DayResult {
   stars: number
@@ -19,10 +20,16 @@ export interface DayResult {
   served: number
   /** Số khách được trả lời đúng ngay mọi câu */
   perfect: number
+  /** Nông sản nhà trồng đã bán, theo loại cây */
+  sold: Record<string, number>
+  /** Ngày đủ dài (đủ số câu tối thiểu) để tính vào tiến độ lên cấp */
+  counted: boolean
 }
 
 interface Props {
   profile: Profile
+  /** Nông sản bé bày lên kệ, theo loại cây (Luyện riêng không dùng) */
+  shelf: Record<string, number>
   /** Luyện riêng một phép tính, không tính vào tiến độ ngày */
   practice: Op | null
   /** Lượt này có được nhận xu không (Luyện riêng giới hạn lượt thưởng mỗi ngày) */
@@ -53,24 +60,48 @@ function starsFor(ratio: number) {
   return 0
 }
 
-export default function ShopGame({ profile, practice, rewarded: rewardedProp, onFinish, onExit, onGoldBonus }: Props) {
-  // Chốt ngày/cấp lúc vào tiệm để kết quả không đổi khi profile cập nhật
+export default function ShopGame({ profile, shelf, practice, rewarded: rewardedProp, onFinish, onExit, onGoldBonus }: Props) {
+  // Chốt ngày/cấp lúc mở sạp để kết quả không đổi khi profile cập nhật
   const [day] = useState(profile.day)
   const [rewarded] = useState(rewardedProp)
+  useEffect(() => {
+    if (!rewarded) warn('Hôm nay hết lượt nhận xu ở Luyện riêng rồi. Vẫn luyện được nhưng không được cộng xu nhé!')
+  }, [])
   const [tier] = useState(() => {
-    const t = tierFor(profile.age, profile.day)
+    const t = tierOf(profile)
     return practice ? practiceTier(t, practice) : t
   })
+  const [goods] = useState(() => {
+    const prices = marketPrices(tier, profile)
+    return practice ? practiceGoods(profile.day, prices) : shelfGoods(shelf, prices)
+  })
   const [visits] = useState(() => {
-    const items = itemsFor(profile.owned)
-    const next = () => genVisit(tier, items, callName(profile.name))
-    const list = [next()]
-    // Khách đến đến khi đủ số câu trong ngày; đồ nâng cấp "thêm khách" cộng thêm khách sau đó
-    for (let n = list[0].steps.length; n < tier.questions; n += list[list.length - 1].steps.length) list.push(next())
-    for (let i = 0; i < extraCustomers(profile); i++) list.push(next())
+    // Giữ chỗ hàng cho từng khách để không hứa bán quá số trên kệ
+    const left = goods.map((g) => ({ ...g }))
+    const next = () => {
+      const v = genVisit(tier, left, callName(profile.name))
+      for (const l of v?.lines ?? []) left.find((g) => g.item.crop === l.item.crop)!.left -= l.qty
+      return v
+    }
+    const list: Visit[] = []
+    // Khách đến đến khi đủ số câu trong ngày hoặc kệ hết hàng; đồ nâng cấp "thêm khách" cộng thêm khách sau đó
+    for (let n = 0; n < tier.questions; ) {
+      const v = next()
+      if (!v) break
+      list.push(v)
+      n += v.steps.length
+    }
+    for (let i = 0; i < extraCustomers(profile); i++) {
+      const v = next()
+      if (v) list.push(v)
+    }
     return list
   })
   const totalSteps = useMemo(() => visits.reduce((s, v) => s + v.steps.length, 0), [visits])
+  /** Kệ ít hàng thì ngày ngắn: phải làm được ít nhất nửa số câu mới sang ngày mới */
+  const enough = practice !== null || totalSteps >= Math.ceil(tier.questions / 2)
+  /** Hàng còn trên kệ (khách mua xong mới bớt) */
+  const [onShelf, setOnShelf] = useState(() => goods.map((g) => ({ emoji: g.item.emoji, count: g.left, price: g.price, crop: g.item.crop! })))
 
   const [vi, setVi] = useState(0)
   const [si, setSi] = useState(0)
@@ -83,7 +114,11 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
   const [result, setResult] = useState<DayResult | null>(null)
   const [lost, setLost] = useState(0)
   const timer = useRef<number>()
-  const tally = useRef({ served: 0, perfect: 0 })
+  const tally = useRef({ served: 0, perfect: 0, sold: {} as Record<string, number> })
+  /** Xu bị trừ vì trả lời sai (bé nhỏ tuổi và lượt không nhận xu thì không trừ) */
+  const fineCost = rewarded && profile.age >= TUNING.coins.mistakeFromAge ? TUNING.coins.mistakeCost : 0
+  const fined = useRef(0)
+  const [fineShown, setFineShown] = useState(0)
   /** Khách hiện tại chưa bị trả lời sai lần nào */
   const visitClean = useRef(true)
 
@@ -134,7 +169,9 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
 
   const finishDay = (coins: number, ft: number, lostNow: number) => {
     const stars = Math.max(0, Math.min(starsFor(ft / totalSteps), MAX_RATING - lostNow))
-    const r = { stars, coins: rewarded ? coins : 0, passed: stars >= 1, ...tally.current }
+    // Tiền bị trừ vì trả lời sai lấy từ tiền lời của lượt này, không xuống dưới 0
+    const net = Math.max(0, coins - fined.current)
+    const r = { stars, coins: rewarded ? net : 0, passed: stars >= 1 && enough, counted: enough, ...tally.current, sold: { ...tally.current.sold } }
     setResult(r)
     onFinish(r)
     sfx.win()
@@ -175,7 +212,11 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
     const clean = visitClean.current
     tally.current.served++
     if (clean) tally.current.perfect++
-    const profit = Math.round((PROFIT_PER_CUSTOMER + (clean ? PERFECT_BONUS : 0)) * coinBonus(profile))
+    // Luyện riêng bày hàng mẫu: không bán hàng trong kho, không lời thêm
+    const produce = practice ? {} : produceIn(visit.lines)
+    for (const [id, n] of Object.entries(produce)) tally.current.sold[id] = (tally.current.sold[id] ?? 0) + n
+    setOnShelf((list) => list.map((g) => ({ ...g, count: Math.max(0, g.count - (produce[g.crop] ?? 0)) })))
+    const profit = Math.round((PROFIT_PER_CUSTOMER + (clean ? PERFECT_BONUS : 0)) * coinBonus(profile)) + produceBonus(produce)
     const coins = earned + profit
     setEarned(coins)
     sfx.coin()
@@ -183,7 +224,7 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
     nextVisit(coins, ft, lost)
   }
 
-  /** Hết kiên nhẫn: khách bỏ về, không trả tiền, tiệm mất 1 sao */
+  /** Hết kiên nhẫn: khách bỏ về, không trả tiền, sạp mất 1 sao */
   const leave = () => {
     window.clearTimeout(timer.current)
     gone.current = true
@@ -212,6 +253,10 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
     }
     sfx.wrong()
     scene.current?.react('bad')
+    if (fineCost) {
+      fined.current += fineCost
+      setFineShown(fined.current)
+    }
     const w = wrong + 1
     setWrong(w)
     left.current = Math.min(left.current, maxMs) - maxMs * WRONG_PENALTY
@@ -249,6 +294,24 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
           ) : (
             <>Hết lượt nhận xu hôm nay, mai quay lại nhé!</>
           )}
+          {Object.keys(result.sold).length > 0 && (
+            <>
+              <br />
+              Nông sản bán được:{' '}
+              <b>
+                {Object.entries(result.sold)
+                  .map(([id, n]) => `${cropOf(id).emoji}×${n}`)
+                  .join(' ')}
+              </b>{' '}
+              (+{produceBonus(result.sold)} {CURRENCY})
+            </>
+          )}
+          {fineShown > 0 && (
+            <>
+              <br />
+              Bán nhầm bị trừ: <b>−{fineShown} {CURRENCY}</b>
+            </>
+          )}
           {lost > 0 && (
             <>
               <br />
@@ -258,34 +321,52 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
         </p>
         {!practice && (
           <p className="result-text">
-            {result.passed ? `Ngày mai tiệm sẽ đông khách hơn đó!` : 'Cần 1 sao để sang ngày mới. Mình bán lại ngày này nhé!'}
+            {result.passed
+              ? result.stars >= TUNING.day.starsToAdvance
+                ? 'Bé tiến bộ thêm một ngày, sắp lên cấp rồi!'
+                : `Sang ngày mới rồi! Được ${'⭐'.repeat(TUNING.day.starsToAdvance)} trở lên mới tính tiến bộ lên cấp nhé.`
+              : !enough
+                ? `Kệ ít hàng quá nên bán xong sớm. Bày thêm hàng để có đủ ${Math.ceil(tier.questions / 2)} câu mới sang ngày mới nhé!`
+                : 'Cần 1 sao để sang ngày mới. Mình bán lại ngày này nhé!'}
+            {onShelf.some((g) => g.count > 0) && (
+              <>
+                <br />
+                🧺 Hàng chưa bán đã cất lại vào kho.
+              </>
+            )}
+            {Object.values(profile.farm.tiles).some((p) => !isRipe(p)) && (
+              <>
+                <br />
+                🌾 Cây ở nông trại bón phân tiếp được rồi!
+              </>
+            )}
           </p>
         )}
         <button className="btn btn-gold btn-xl" onClick={onGoldBonus}>
           ⛏️ Đi đào vàng
         </button>
         <button className="btn btn-primary btn-xl" onClick={onExit}>
-          🏪 Về tiệm
+          🌾 Về nông trại
         </button>
       </div>
     )
   }
 
   const paidVisible = step.showPaid && visit.paid !== undefined
-  const totalKnown = paidVisible && visit.steps.length > 1
+  const totalKnown = paidVisible
 
   return (
     <div className="screen shop">
       <header className="topbar">
-        <button className="icon-btn" onClick={onExit} aria-label="Về tiệm">
+        <button className="icon-btn" onClick={onExit} aria-label="Về nông trại">
           ⬅️
         </button>
         <div className="chip">{practice ? tier.name : `Ngày ${day}`}</div>
         <div className="chip" aria-label="Khách">
           👤 {vi + 1}/{visits.length}
         </div>
-        <div className="chip">🪙 {earned}</div>
-        <div className="chip rating" aria-label={`Uy tín tiệm: ${MAX_RATING - lost} sao`}>
+        <div className="chip">🪙 {Math.max(0, earned - fineShown)}</div>
+        <div className="chip rating" aria-label={`Uy tín sạp: ${MAX_RATING - lost} sao`}>
           {Array.from({ length: MAX_RATING }, (_, i) => (
             <span key={i} className={i < MAX_RATING - lost ? 'on' : 'off'}>
               ★
@@ -299,8 +380,8 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
         mode="shop"
         level={shopLevel(profile.shopLevel)}
         owned={profile.owned}
-        opening
         getPatience={ratio}
+        market={onShelf}
       />
 
       {arrived ? (
@@ -328,7 +409,12 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
         {visit.lines.map((l, i) => (
           <div className="line" key={i}>
             <div className="line-items">
-              {l.qty <= 20 ? (
+              {/* Khách đưa tiền hỏi mua được mấy món: chưa cho bé đếm sẵn */}
+              {visit.hideQty && feedback !== 'reveal' && feedback !== 'ok' ? (
+                <span>
+                  {l.item.emoji} × ?
+                </span>
+              ) : l.qty <= 20 ? (
                 Array.from({ length: l.qty }, (_, j) => <span key={j}>{l.item.emoji}</span>)
               ) : (
                 <span>
@@ -338,7 +424,7 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
             </div>
             {!NO_PRICE_KINDS.includes(visit.kind) && (
               <div className="price-tag">
-                {visit.hidePrice ? '?' : l.price} {CURRENCY}
+                {l.price} {CURRENCY}
               </div>
             )}
           </div>
@@ -349,7 +435,7 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
             {visit.targets.emoji.repeat(visit.targets.count)}
           </div>
         )}
-        {visit.hidePrice && <div className="total-tag">Tổng: {visit.total} {CURRENCY}</div>}
+        {visit.hideQty && <div className="paid-tag">Khách đưa: 🪙 {visit.total} {CURRENCY}</div>}
         {totalKnown && <div className="total-tag">Tổng: {visit.total} {CURRENCY}</div>}
         {paidVisible && <div className="paid-tag">Khách đưa: 💵 {visit.paid} {CURRENCY}</div>}
       </div>
@@ -362,7 +448,7 @@ export default function ShopGame({ profile, practice, rewarded: rewardedProp, on
       )}
 
       {feedback === 'ok' && <div className="toast ok">✅ {praise}</div>}
-      {feedback === 'bad' && <div className="toast bad">🤔 Thử lại nhé!</div>}
+      {feedback === 'bad' && <div className="toast bad">🤔 Thử lại nhé!{fineCost > 0 && ` −${fineCost} ${CURRENCY}`}</div>}
       {feedback === 'reveal' && <div className="toast reveal">Đáp án là {step.answer}</div>}
       {feedback === 'leave' && <div className="toast bad">😤 Khách chờ lâu quá nên bỏ về! −1 ⭐</div>}
 

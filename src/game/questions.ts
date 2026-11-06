@@ -1,10 +1,11 @@
-import { CUSTOMERS, ITEMS, nounOf, unitOf, type Customer, type Item } from './items'
+import { CUSTOMERS, nounOf, unitOf, type Customer, type Item } from './items'
 import type { Kind, Op, Tier } from './levels'
 import { distractors, pick, rand, shuffle } from './random'
+import { TUNING } from './tuning'
 
 export const CURRENCY = 'xu'
 
-/** Chỗ giữ tên chủ tiệm trong câu thoại; genVisit thay bằng tên bé */
+/** Chỗ giữ tên chủ sạp trong câu thoại; genVisit thay bằng tên bé */
 const OWNER = '{chủ tiệm}'
 
 export interface Line {
@@ -36,34 +37,43 @@ export interface Visit {
   kind: Kind
   customer: Customer
   lines: Line[]
-  /** Ẩn giá (bài chia: phải tìm giá) */
-  hidePrice?: boolean
+  /** Khách đưa tiền hỏi mua được mấy món: chưa cho bé thấy số món */
+  hideQty?: boolean
   paid?: number
-  /** Số xu bé được khi phục vụ xong khách */
+  /** Tổng tiền khách trả */
   total: number
   steps: Step[]
   /** Người/túi nhận hàng khi chia đều, vd 3 × 🛍️ */
   targets?: { emoji: string; count: number }
 }
 
-/** Các dạng không hỏi về tiền nên không hiện bảng giá */
+/** Một loại nông sản đang bày trên kệ */
+export interface Goods {
+  item: Item
+  /** Giá cố định một món (đã nhân theo cấp) */
+  price: number
+  /** Số món còn trên kệ */
+  left: number
+}
+
+/** Các dạng không hỏi về tiền nên không hiện giá ở quầy */
 export const NO_PRICE_KINDS: Kind[] = ['count', 'share', 'group', 'remainder']
 
 const DIV_HINT_MAX = 30
-
-function randPrice(t: Tier) {
-  const [lo, hi] = t.price
-  return lo + rand(0, Math.floor((hi - lo) / t.priceStep)) * t.priceStep
-}
+/** Thử bấy nhiêu lần tìm câu hỏi hợp với hàng còn trên kệ */
+const TRIES = 60
 
 const sumOf = (lines: Line[]) => lines.reduce((s, l) => s + l.qty * l.price, 0)
+const countOf = (lines: Line[]) => lines.reduce((s, l) => s + l.qty, 0)
 
+/** "2 quả cà chua, 1 trái bắp và 1 quả bí ngô" */
 function describe(lines: Line[]) {
-  return {
-    emoji: lines.map((l) => `${l.qty} ${l.item.emoji}`).join(' và '),
-    speech: lines.map((l) => `${l.qty} ${l.item.name}`).join(' và '),
-  }
+  const parts = lines.map((l) => `${l.qty} ${l.item.name}`)
+  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} và ${parts[parts.length - 1]}` : parts[0]
 }
+
+/** Khách xưng ở giữa câu: viết thường chữ đầu, vd "bán cho chú công an" */
+const who = (c: Customer) => c.title.charAt(0).toLowerCase() + c.title.slice(1)
 
 function totalExpr(lines: Line[], useMul: boolean) {
   return lines
@@ -76,58 +86,69 @@ function totalExpr(lines: Line[], useMul: boolean) {
 
 function totalStep(c: Customer, lines: Line[], t: Tier): Step {
   const total = sumOf(lines)
-  const d = describe(lines)
+  const text = `${OWNER} ơi, bán cho ${who(c)} ${describe(lines)}. Hết bao nhiêu ${CURRENCY}?`
   return {
-    prompt: `${OWNER} ơi, ${c.title} mua ${d.emoji}. Hết bao nhiêu ${CURRENCY}?`,
-    speech: `${OWNER} ơi, ${c.title} mua ${d.speech}. Hết bao nhiêu ${CURRENCY}?`,
+    prompt: text,
+    speech: text,
     expr: `${totalExpr(lines, t.useMul)} = ?`,
     answer: total,
     hint: total <= 20 ? { groups: lines.flatMap((l) => Array<number>(l.qty).fill(l.price)) } : undefined,
   }
 }
 
-function genLines(t: Tier, maxTotal: number, items: Item[]): Line[] {
-  for (let tries = 0; tries < 300; tries++) {
-    const n = rand(Math.min(2, t.maxTypes), t.maxTypes)
-    const lines = shuffle(items).slice(0, n).map((item) => ({ item, qty: rand(1, t.qtyMax), price: randPrice(t) }))
-    if (sumOf(lines) <= maxTotal) return lines
-  }
-  return [{ item: pick(items), qty: 1, price: t.price[0] }]
+/** Chọn `n` loại hàng khác nhau, số lượng mỗi loại không quá `qtyMax` và hàng còn trên kệ */
+function pickLines(avail: Goods[], n: number, qtyMax: number): Line[] {
+  return shuffle(avail)
+    .slice(0, n)
+    .map((g) => ({ item: g.item, qty: rand(1, Math.min(qtyMax, g.left)), price: g.price }))
+}
+
+/** Một loại hàng còn ít nhất `min` món trên kệ */
+function pickGoods(avail: Goods[], min: number) {
+  const ok = avail.filter((g) => g.left >= min)
+  return ok.length ? pick(ok) : null
 }
 
 /**
- * `items`: các mặt hàng tiệm đang bán (mở thêm khi nâng cấp tiệm)
- * `owner`: tên bé, khách gọi chủ tiệm bằng tên này
+ * Khách tới sạp mua hàng đang bày trên kệ; null khi kệ đã hết hàng.
+ * `owner`: tên bé, khách gọi chủ sạp bằng tên này
  */
-export function genVisit(t: Tier, items: Item[] = ITEMS, owner = 'Cậu Lớn'): Visit {
-  const v = buildVisit(t, items)
+export function genVisit(t: Tier, goods: Goods[], owner = 'Cậu Lớn'): Visit | null {
+  const avail = goods.filter((g) => g.left > 0)
+  if (!avail.length) return null
+  const customer = pick(CUSTOMERS)
+  let v: Visit | null = null
+  for (let i = 0; i < TRIES && !v; i++) v = buildVisit(t, pick(t.kinds), avail, customer)
+  // Kệ còn ít hàng, không dạng nào vừa: hỏi đếm hoặc tính tiền một món
+  v ??= singleItem(t, avail[0], customer)
   const named = (s: string) => s.split(OWNER).join(owner)
   return { ...v, steps: v.steps.map((s) => ({ ...s, prompt: named(s.prompt), speech: named(s.speech) })) }
 }
 
-function buildVisit(t: Tier, items: Item[]): Visit {
-  const customer = pick(CUSTOMERS)
-  const c = customer
-  const kind = pick(t.kinds)
+function singleItem(t: Tier, g: Goods, c: Customer): Visit {
+  const lines = [{ item: g.item, qty: 1, price: g.price }]
+  if (t.kinds.includes('count')) return buildVisit(t, 'count', [{ ...g, left: 1 }], c)!
+  return { kind: 'total', customer: c, lines, total: g.price, steps: [totalStep(c, lines, t)] }
+}
 
+/** Dựng một lượt khách theo dạng `kind`; null nếu hàng trên kệ không vừa dạng này */
+function buildVisit(t: Tier, kind: Kind, avail: Goods[], c: Customer): Visit | null {
   switch (kind) {
     case 'count': {
-      const types = rand(1, t.maxTypes)
-      let lines: Line[]
-      do {
-        lines = shuffle(items).slice(0, types).map((item) => ({ item, qty: rand(1, t.countMax), price: 1 }))
-      } while (sumOf(lines) > t.maxTotal)
-      const total = sumOf(lines)
-      const single = types === 1
+      const lines = pickLines(avail, rand(1, Math.min(t.maxTypes, avail.length)), t.countMax)
+      const total = countOf(lines)
+      if (total > t.maxTotal) return null
+      const single = lines.length === 1
+      const item = lines[0].item
       const prompt = single
-        ? `${OWNER} ơi, ${c.title} lấy mấy ${unitOf(lines[0].item)} ${nounOf(lines[0].item)} vậy?`
-        : `${OWNER} ơi, ${c.title} lấy tất cả mấy món vậy?`
+        ? `${OWNER} ơi, ${who(c)} lấy mấy ${unitOf(item)} ${nounOf(item)} vậy?`
+        : `${OWNER} ơi, ${who(c)} lấy tất cả mấy món vậy?`
       return {
-        kind, customer, lines, total,
+        kind, customer: c, lines, total: sumOf(lines),
         steps: [{
           prompt,
-          speech: single ? prompt : `${OWNER} ơi, ${c.title} lấy ${describe(lines).speech}. Tất cả mấy món vậy?`,
-          expr: single ? `Đếm ${lines[0].item.emoji}: có mấy?` : `${lines.map((l) => l.qty).join(' + ')} = ?`,
+          speech: single ? prompt : `${OWNER} ơi, ${who(c)} lấy ${describe(lines)}. Tất cả mấy món vậy?`,
+          expr: single ? `Đếm ${item.emoji}: có mấy?` : `${lines.map((l) => l.qty).join(' + ')} = ?`,
           answer: total,
           hint: { groups: lines.map((l) => l.qty) },
         }],
@@ -135,20 +156,26 @@ function buildVisit(t: Tier, items: Item[]): Visit {
     }
 
     case 'total': {
-      const lines = genLines(t, t.maxTotal, items)
-      return { kind, customer, lines, total: sumOf(lines), steps: [totalStep(c, lines, t)] }
+      const types = Math.min(t.maxTypes, avail.length)
+      const lines = pickLines(avail, rand(Math.min(2, types), types), t.qtyMax)
+      const total = sumOf(lines)
+      if (total > t.maxTotal) return null
+      return { kind, customer: c, lines, total, steps: [totalStep(c, lines, t)] }
     }
 
     case 'change': {
       const maxBill = Math.max(...t.bills)
-      const lines = t.changeSteps === 1
-        ? [{ item: pick(items), qty: 1, price: rand(1, maxBill - 1) }]
-        : genLines(t, maxBill - 1, items)
+      // Một bước: chỉ một loại hàng để bé thấy rõ mua gì, hết bao nhiêu
+      const types = t.changeSteps === 1 ? 1 : rand(1, Math.min(t.maxTypes, avail.length))
+      const lines = pickLines(avail, types, t.qtyMax)
       const total = sumOf(lines)
-      const paid = t.bills.find((b) => b > total) ?? maxBill
-      const text = t.changeSteps === 1
-        ? `Hết ${total} ${CURRENCY}. ${c.title} đưa ${paid} ${CURRENCY}. ${OWNER} thối lại mấy ${CURRENCY}?`
-        : `${c.title} đưa ${paid} ${CURRENCY}. ${OWNER} thối lại mấy ${CURRENCY}?`
+      if (total >= maxBill) return null
+      // Khách đưa một tờ bất kỳ đủ trả, không phải lúc nào cũng tờ nhỏ nhất
+      const paid = pick(t.bills.filter((b) => b > total))
+      // Chỉ mua 1 món thì giá đã ghi sẵn: hỏi luôn tiền thối, không hỏi tổng
+      const oneStep = t.changeSteps === 1 || (lines.length === 1 && lines[0].qty === 1)
+      const ask = `${c.title} đưa ${paid} ${CURRENCY}. ${OWNER} thối lại mấy ${CURRENCY}?`
+      const text = oneStep ? `${c.title} mua ${describe(lines)}, hết ${total} ${CURRENCY}. ${ask}` : ask
       const changeStep: Step = {
         prompt: text,
         speech: text,
@@ -157,52 +184,64 @@ function buildVisit(t: Tier, items: Item[]): Visit {
         hint: paid <= 20 ? { takeAway: { from: paid, take: total } } : undefined,
         showPaid: true,
       }
-      const steps = t.changeSteps === 1 ? [changeStep] : [totalStep(c, lines, t), changeStep]
-      return { kind, customer, lines, total, paid, steps }
+      const steps = oneStep ? [changeStep] : [totalStep(c, lines, t), changeStep]
+      return { kind, customer: c, lines, total, paid, steps }
     }
 
     case 'multiply': {
-      const item = pick(items)
-      const qty = rand(2, t.mulQty)
-      const price = rand(2, t.mulPrice)
-      const total = qty * price
-      const text = `${OWNER} ơi, ${c.title} mua ${qty} ${item.name}, mỗi ${unitOf(item)} ${price} ${CURRENCY}. Hết bao nhiêu ${CURRENCY}?`
+      const g = pickGoods(avail, 2)
+      if (!g) return null
+      const qty = rand(2, Math.min(t.mulQty, g.left))
+      const total = qty * g.price
+      if (total > t.maxTotal) return null
+      const text = `${OWNER} ơi, bán cho ${who(c)} ${qty} ${g.item.name}. Mỗi ${unitOf(g.item)} ${g.price} ${CURRENCY}. Hết bao nhiêu ${CURRENCY}?`
       return {
-        kind, customer, lines: [{ item, qty, price }], total,
+        kind, customer: c, lines: [{ item: g.item, qty, price: g.price }], total,
         steps: [{
           prompt: text,
           speech: text,
-          expr: `${qty} × ${price} = ?`,
+          expr: `${qty} × ${g.price} = ?`,
           answer: total,
-          hint: total <= 20 ? { groups: Array<number>(qty).fill(price) } : undefined,
+          hint: total <= 20 ? { groups: Array<number>(qty).fill(g.price) } : undefined,
         }],
       }
     }
 
     case 'divide': {
-      const item = pick(items)
-      const qty = rand(2, 9)
-      const price = rand(2, t.divMax)
-      const total = qty * price
-      const text = `${OWNER} ơi, ${c.title} mua ${qty} ${item.name} hết ${total} ${CURRENCY}. Mỗi ${unitOf(item)} giá mấy ${CURRENCY}?`
+      // Khách đưa một số tiền, hỏi mua được mấy món
+      const g = pickGoods(avail, 2)
+      if (!g || g.price < 2) return null
+      const qty = rand(2, Math.min(9, g.left))
+      const budget = qty * g.price
+      if (budget > t.maxTotal) return null
+      const unit = unitOf(g.item)
+      const text = `${OWNER} ơi, bán cho ${who(c)} ${budget} ${CURRENCY} ${nounOf(g.item)} nhé. Mỗi ${unit} ${g.price} ${CURRENCY}, được mấy ${unit}?`
       return {
-        kind, customer, lines: [{ item, qty, price }], total, hidePrice: true,
-        steps: [{ prompt: text, speech: text, expr: `${total} : ${qty} = ?`, answer: price }],
+        kind, customer: c, lines: [{ item: g.item, qty, price: g.price }], total: budget, hideQty: true,
+        steps: [{
+          prompt: text,
+          speech: text,
+          expr: `${budget} : ${g.price} = ?`,
+          answer: qty,
+          hint: budget <= DIV_HINT_MAX ? { bags: { count: qty, per: g.price, extra: 0, emoji: '🪙' } } : undefined,
+        }],
       }
     }
 
     case 'share': {
-      const item = pick(items)
+      const g = pickGoods(avail, 2)
+      if (!g) return null
       const n = rand(2, t.shareDiv)
       const each = rand(1, t.shareQuot)
       const total = n * each
-      const unit = unitOf(item)
+      if (total > g.left) return null
+      const unit = unitOf(g.item)
       const toFriends = Math.random() < 0.5
       const text = toFriends
-        ? `${OWNER} ơi, ${c.title} mua ${total} ${item.name} chia đều cho ${n} bạn. Mỗi bạn được mấy ${unit}?`
-        : `${OWNER} xếp ${total} ${item.name} vào ${n} túi đều nhau giúp ${c.title} nhé. Mỗi túi mấy ${unit}?`
+        ? `${OWNER} ơi, ${who(c)} mua ${total} ${g.item.name} chia đều cho ${n} bạn. Mỗi bạn được mấy ${unit}?`
+        : `${OWNER} xếp ${total} ${g.item.name} vào ${n} túi đều nhau giúp ${who(c)} nhé. Mỗi túi mấy ${unit}?`
       return {
-        kind, customer, lines: [{ item, qty: total, price: 1 }], total,
+        kind, customer: c, lines: [{ item: g.item, qty: total, price: g.price }], total: total * g.price,
         targets: { emoji: toFriends ? '🧒' : '🛍️', count: n },
         steps: [{
           prompt: text,
@@ -216,13 +255,15 @@ function buildVisit(t: Tier, items: Item[]): Visit {
 
     case 'group':
     case 'remainder': {
-      const item = pick(items)
+      const g = pickGoods(avail, 2)
+      if (!g) return null
       const per = rand(2, t.shareDiv)
       const bags = rand(1, t.shareQuot)
       const extra = kind === 'remainder' ? rand(1, per - 1) : 0
       const total = per * bags + extra
-      const unit = unitOf(item)
-      const ask = `${OWNER} ơi, ${c.title} cần ${total} ${item.name}, mỗi túi đựng ${per} ${unit}.`
+      if (total > g.left) return null
+      const unit = unitOf(g.item)
+      const ask = `${OWNER} ơi, ${who(c)} mua ${total} ${g.item.name}, mỗi túi đựng ${per} ${unit}.`
       const hint = total <= DIV_HINT_MAX ? { bags: { count: bags, per, extra, emoji: '🛍️' } } : undefined
       const first: Step = {
         prompt: `${ask} ${extra ? 'Đóng được mấy túi đầy?' : 'Cần mấy túi?'}`,
@@ -236,7 +277,7 @@ function buildVisit(t: Tier, items: Item[]): Visit {
         const rest = `Đóng được ${bags} túi. Còn dư mấy ${unit}?`
         steps.push({ prompt: rest, speech: rest, expr: `${total} - ${bags} × ${per} = ?`, answer: extra, hint })
       }
-      return { kind, customer, lines: [{ item, qty: total, price: 1 }], total, steps }
+      return { kind, customer: c, lines: [{ item: g.item, qty: total, price: g.price }], total: total * g.price, steps }
     }
   }
 }
@@ -269,18 +310,19 @@ export function genDrill(tierId: number, op?: Op): Drill {
     const b = rand(1, maxB)
     return { expr: `${a} × ${b}`, answer: a * b }
   }
-  const div = (max: number): Drill => {
+  /** Số chia đến `max`, thương đến `maxQ` */
+  const div = (max: number, maxQ = max): Drill => {
     const b = rand(2, max)
-    const q = rand(1, max)
+    const q = rand(1, maxQ)
     return { expr: `${b * q} : ${b}`, answer: q }
   }
   if (op) {
-    const addMax = [5, 10, 10, 20, 50, 100, 100, 100, 1000][tierId - 1]
+    const addMax = [5, 10, 10, 20, 50, 100, 100, 100, 1000, 10000, 10000, 100000][Math.min(tierId, 12) - 1]
     switch (op) {
       case 'add': return add(addMax)
       case 'sub': return sub(addMax)
-      case 'mul': return tierId <= 3 ? mul(3, 3) : tierId <= 6 ? mul(5, 10) : mul(10, 10)
-      case 'div': return div(tierId <= 3 ? 3 : tierId <= 6 ? 5 : tierId <= 8 ? 9 : 10)
+      case 'mul': return tierId <= 3 ? mul(3, 3) : tierId <= 6 ? mul(5, 10) : tierId <= 9 ? mul(10, 10) : mul(99, 9)
+      case 'div': return tierId <= 9 ? div(tierId <= 3 ? 3 : tierId <= 6 ? 5 : tierId <= 8 ? 9 : 10) : div(9, 99)
     }
   }
   switch (tierId) {
@@ -292,7 +334,14 @@ export function genDrill(tierId: number, op?: Op): Drill {
     case 6: return Math.random() < 0.8 ? addSub(100) : div(3)
     case 7: return pick([() => mul(5, 10), () => mul(5, 10), () => div(5), () => addSub(100)])()
     case 8: return pick([() => mul(9, 10), () => div(9), () => div(9), () => sub(100)])()
-    default: return pick([() => mul(10, 10), () => div(10), () => add(1000), () => sub(1000)])()
+    case 9: return pick([() => mul(10, 10), () => div(10), () => add(1000), () => sub(1000)])()
+    case 10: return pick([() => mul(99, 9), () => div(9, 20), () => add(10000), () => sub(10000)])()
+    case 11: return pick([() => mul(99, 9), () => mul(99, 9), () => div(9, 99), () => div(9, 99)])()
+    // Cấp cuối và các bậc sau: số to dần
+    default: {
+      const big = Math.round(100000 * TUNING.day.beyondGrowth ** Math.max(0, tierId - 12))
+      return pick([() => mul(999, 9), () => div(9, 999), () => add(big), () => sub(big)])()
+    }
   }
 }
 

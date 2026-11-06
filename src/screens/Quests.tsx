@@ -1,6 +1,7 @@
 import type { Profile } from '../game/storage'
 import { CHEST_REWARD, CHECKIN_REWARDS, QUEST_ICON, ensureDaily, questText } from '../game/daily'
 import { sfx } from '../game/sound'
+import { warn } from '../components/Warning'
 
 interface Props {
   profile: Profile
@@ -17,7 +18,7 @@ export default function Quests({ profile, onClaimQuest, onClaimChest, onExit }: 
   return (
     <div className="screen">
       <header className="topbar">
-        <button className="icon-btn" onClick={onExit} aria-label="Về tiệm">
+        <button className="icon-btn" onClick={onExit} aria-label="Về nông trại">
           ⬅️
         </button>
         <h1 className="screen-title">📋 Nhiệm vụ hôm nay</h1>
@@ -55,9 +56,9 @@ export default function Quests({ profile, onClaimQuest, onClaimChest, onExit }: 
                 <span className="upgrade-owned">✅</span>
               ) : (
                 <button
-                  className="btn btn-gold upgrade-buy"
-                  disabled={!done}
+                  className={`btn btn-gold upgrade-buy ${done ? '' : 'locked'}`}
                   onClick={() => {
+                    if (!done) return warn(`Nhiệm vụ chưa xong (${q.progress}/${q.target}). Làm tiếp rồi quay lại nhận thưởng nhé!`)
                     sfx.coin()
                     onClaimQuest(i)
                   }}
@@ -78,9 +79,9 @@ export default function Quests({ profile, onClaimQuest, onClaimChest, onExit }: 
         </div>
         {!daily.chestClaimed && (
           <button
-            className="btn btn-gold upgrade-buy"
-            disabled={!allClaimed}
+            className={`btn btn-gold upgrade-buy ${allClaimed ? '' : 'locked'}`}
             onClick={() => {
+              if (!allClaimed) return warn('Nhận thưởng cả 3 nhiệm vụ trước rồi mới mở được rương nhé!')
               sfx.win()
               onClaimChest()
             }}

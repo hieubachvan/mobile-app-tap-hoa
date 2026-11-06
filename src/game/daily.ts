@@ -5,10 +5,10 @@ export const CHECKIN_REWARDS = TUNING.coins.checkin
 
 export const CHEST_REWARD = TUNING.coins.chest
 
-/** Mỗi ngày chỉ bấy nhiêu lượt Đào vàng / Luyện riêng được nhận xu; chơi thêm vẫn được nhưng không có xu */
+/** Mỗi ngày chỉ bấy nhiêu lượt Đào vàng / Luyện riêng / Câu cá được nhận thưởng; chơi thêm vẫn được nhưng không có xu */
 export const REWARD_RUNS_PER_DAY = TUNING.coins.rewardRunsPerDay
 
-export type RewardGame = 'gold' | 'practice'
+export type RewardGame = 'gold' | 'practice' | 'fish'
 
 export type QuestKind = 'serve' | 'perfect' | 'gold' | 'practice' | 'stars'
 

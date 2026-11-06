@@ -27,6 +27,14 @@ body {
   overscroll-behavior: none;
 }
 
+/* Khóa cuộn khi ở màn nông trại chính (vừa khít màn hình); màn khác vẫn cuộn được bình thường */
+html.scroll-locked,
+body.scroll-locked {
+  overflow: hidden;
+  height: 100%;
+  touch-action: none;
+}
+
 button {
   font: inherit;
   color: inherit;
@@ -36,6 +44,7 @@ button {
 
 .app {
   max-width: 480px;
+  min-height: 100vh;
   min-height: 100dvh;
   margin: 0 auto;
   background: var(--bg);
@@ -129,6 +138,66 @@ button {
 .btn:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+/* Chưa đủ điều kiện: trông mờ như bị khoá nhưng vẫn bấm được để báo lý do */
+.btn.locked,
+.step-btn.locked,
+.seed.locked {
+  opacity: 0.45;
+}
+
+.btn.locked:active {
+  transform: none;
+}
+
+/* ---------- Cảnh báo không làm được ---------- */
+.warn-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(59, 42, 26, 0.35);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: calc(90px + env(safe-area-inset-top)) 16px 16px;
+}
+
+.warn-card {
+  width: 100%;
+  max-width: 360px;
+  background: #fff4d6;
+  border: 4px solid #ff9800;
+  border-radius: 22px;
+  box-shadow: 0 6px 0 #e07b00;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  animation: warn-shake 0.5s ease-out;
+}
+
+.warn-icon {
+  font-size: 44px;
+  line-height: 1;
+}
+
+.warn-card p {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: #7a3b00;
+}
+
+@keyframes warn-shake {
+  0% { transform: scale(0.7); }
+  35% { transform: scale(1.05) translateX(-8px); }
+  50% { transform: translateX(8px); }
+  65% { transform: translateX(-5px); }
+  80% { transform: translateX(3px); }
+  100% { transform: none; }
 }
 
 .btn-xl {
@@ -1214,7 +1283,105 @@ button {
   touch-action: none;
   user-select: none;
   display: block;
+  max-height: calc(100vh - 220px);
   max-height: calc(100dvh - 220px);
+}
+
+.mine.pond {
+  box-shadow: 0 4px 0 #1f6f9e;
+  max-height: calc(100vh - 300px);
+  max-height: calc(100dvh - 300px);
+}
+
+/* Bảng trên ao: giữ cao cố định để ao không nhảy khi cá cắn câu */
+.pond-panel {
+  min-height: 92px;
+  justify-content: center;
+  gap: 2px;
+}
+
+.fish-legend {
+  display: flex;
+  gap: 14px;
+}
+
+.drill .fish-legend {
+  font-size: 22px;
+}
+
+.fish-timer {
+  width: 80%;
+  height: 8px;
+  border-radius: 4px;
+  background: #e8eef3;
+  overflow: hidden;
+}
+
+.fish-timer i {
+  display: block;
+  height: 100%;
+  background: #43a047;
+  transition: background 0.2s;
+}
+
+.fish-timer i.low {
+  background: #e53935;
+}
+
+.pond-bottom {
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.fish-choices {
+  margin-top: 0;
+}
+
+.fish-choices .choice-btn {
+  font-size: 30px;
+  padding: 8px 0;
+}
+
+/* ---------- Chuồng gà ---------- */
+.mine.coop {
+  box-shadow: 0 4px 0 #8b5a2b;
+  max-height: calc(100vh - 300px);
+  max-height: calc(100dvh - 300px);
+}
+
+.coop-panel span {
+  font-size: 26px;
+  text-align: center;
+  padding: 0 8px;
+}
+
+.coop-result-img {
+  height: 110px;
+}
+
+.coop-q-img {
+  max-height: 120px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+/* Đáp án bài hình học có thể là chữ: chữ nhỏ hơn, tự xuống 2 cột khi nhiều đáp án */
+.coop-choices {
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+}
+
+.coop-choices .choice-btn {
+  font-size: 22px;
+  padding: 10px 6px;
+  line-height: 1.15;
+}
+
+.coop-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 .nugget-label {
@@ -1365,4 +1532,707 @@ button {
   *, *::before, *::after {
     animation: none !important;
   }
+}
+
+/* ---------- Nông trại ---------- */
+.action-btn.wide {
+  grid-column: 1 / -1;
+}
+
+/* Khung bản đồ nông trại: trời xanh phía sau đảo */
+.yard {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(#bfe8ff, #a6dcfb 55%, #8fd0f5);
+  border-radius: var(--radius);
+  box-shadow: 0 5px 0 #6aaed6;
+}
+
+.farm-map {
+  position: absolute;
+  inset: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Màn chính: bản đồ chiếm hết phần dưới thanh trên, nút và công cụ nổi trên bản đồ */
+.farm-home {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.farm-home .topbar {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.farm-home .topbar .chip {
+  padding: 4px 10px;
+}
+
+.farm-home .topbar .icon-btn {
+  position: relative;
+  margin-left: 0;
+  flex-shrink: 0;
+}
+
+.farm-home .topbar .quest-btn {
+  margin-left: auto;
+}
+
+.farm-home .yard {
+  flex: 1;
+  min-height: 0;
+}
+
+.map-hud {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.hud-chip {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border: none;
+  border-radius: 14px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.12);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+  text-align: left;
+}
+
+.hud-chip small {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.map-side {
+  position: absolute;
+  top: 8px;
+  right: 6px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.map-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 60px;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.map-btn-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 25px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.18);
+}
+
+.map-btn.main .map-btn-icon {
+  width: 56px;
+  height: 56px;
+  font-size: 30px;
+  background: var(--primary);
+  box-shadow: 0 4px 0 var(--primary-dark);
+}
+
+.map-btn:active .map-btn-icon {
+  transform: translateY(2px);
+}
+
+.map-btn-label {
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7), 0 0 4px rgba(0, 0, 0, 0.4);
+}
+
+.map-btn.locked .map-btn-icon {
+  background: #e8e2d8;
+  filter: grayscale(0.5);
+}
+
+.map-btn-lock {
+  position: absolute;
+  top: 28px;
+  right: 4px;
+  font-size: 14px;
+}
+
+.map-btn .badge {
+  top: -4px;
+  right: 2px;
+  min-width: 20px;
+  height: 20px;
+  font-size: 12px;
+}
+
+.map-bottom {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.map-bottom > * {
+  pointer-events: auto;
+}
+
+.map-bottom .farm-tools {
+  gap: 6px;
+}
+
+.map-bottom .farm-tool {
+  padding: 3px 4px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.93);
+}
+
+.map-bottom .farm-tool span {
+  font-size: 24px;
+}
+
+.map-bottom .seed-tray {
+  padding: 2px 2px 4px;
+}
+
+.map-bottom .seed {
+  min-width: 58px;
+  padding: 2px 4px;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.93);
+}
+
+.map-bottom .seed-emoji {
+  font-size: 22px;
+}
+
+.farm-home .farm-toast {
+  top: auto;
+  bottom: 140px;
+}
+
+.map-panel {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  z-index: 20;
+  transform: translate(-50%, -50%);
+  width: min(280px, 78%);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--bg);
+  text-align: center;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.15), 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.map-panel small {
+  color: var(--muted);
+}
+
+.map-panel .btn {
+  font-size: 17px;
+  padding: 10px 14px;
+}
+
+.map-panel .farm-stock-list {
+  justify-content: center;
+}
+
+/* Ruộng HTML (máy không dựng được cảnh PixiJS): hàng rào gỗ bao quanh, ô vuông theo số hàng/cột */
+.field {
+  position: relative;
+  margin: 8px;
+  padding: 8px;
+  border-radius: 14px;
+  background: #6fb24f;
+  border: 5px solid #a06a3b;
+  box-shadow: inset 0 0 0 3px #c48a52;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.field-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
+  gap: 5px;
+  aspect-ratio: var(--cols) / var(--rows);
+}
+
+.tile {
+  position: relative;
+  border-radius: 10px;
+  background: repeating-linear-gradient(0deg, #a86b3c 0 7px, #96592d 7px 12px);
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.18), 0 2px 0 rgba(0, 0, 0, 0.15);
+  container-type: inline-size;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+}
+
+/* Đất có cây: tưới ẩm nên sẫm hơn */
+.tile.planted {
+  background: repeating-linear-gradient(0deg, #8a5228 0 7px, #7a4620 7px 12px);
+}
+
+.tile.ripe {
+  box-shadow: inset 0 0 0 3px #ffd76a, 0 0 10px #ffe58a;
+}
+
+.tile.fresh {
+  animation: tile-in 0.6s ease-out both;
+}
+
+@keyframes tile-in {
+  from {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.1);
+  }
+}
+
+.tile-crop {
+  font-size: calc(62cqw * var(--grow));
+  line-height: 1;
+  transform-origin: 50% 90%;
+  animation: crop-grow 0.45s ease-out both;
+  pointer-events: none;
+}
+
+.tile-crop img {
+  display: block;
+  height: 1.3em;
+  width: auto;
+  pointer-events: none;
+}
+
+.tile.ripe .tile-crop {
+  animation: crop-grow 0.45s ease-out both, ripe-bob 1.2s 0.45s ease-in-out infinite;
+}
+
+@keyframes crop-grow {
+  from {
+    transform: scale(0.3);
+  }
+  70% {
+    transform: scale(1.15);
+  }
+}
+
+@keyframes ripe-bob {
+  50% {
+    transform: translateY(-6%) rotate(-4deg);
+  }
+}
+
+.tile-need {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: max(12px, 22cqw);
+  line-height: 1;
+  animation: bob 1s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.tile-dots {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  pointer-events: none;
+}
+
+.tile-dots i {
+  width: max(5px, 8cqw);
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.tile-dots i.on {
+  background: #8dff7a;
+}
+
+/* Chữ bay lên khi gieo/bón/hái */
+.tile-fx {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  z-index: 60;
+  font-weight: 800;
+  font-size: max(14px, 26cqw);
+  white-space: nowrap;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  animation: fx-up 0.9s ease-out forwards;
+  pointer-events: none;
+}
+
+.tile-fx.harvest {
+  color: #fff3b0;
+}
+
+@keyframes fx-up {
+  from {
+    transform: translate(-50%, 0) scale(0.6);
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, -120%) scale(1.1);
+    opacity: 0;
+  }
+}
+
+/* Cô chú nông dân: đặt theo chân, đi bằng transition left/top */
+.farmer {
+  position: absolute;
+  height: clamp(54px, calc(130% / var(--rows)), 104px);
+  transform: translate(-50%, -100%);
+  transition: left var(--dur) linear, top var(--dur) linear;
+  pointer-events: none;
+}
+
+.farmer img {
+  height: 100%;
+  display: block;
+  transform: scaleX(var(--face, 1));
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.25));
+}
+
+.farmer.walk img {
+  animation: farmer-step 0.32s ease-in-out infinite alternate;
+}
+
+.farmer.work img {
+  animation: farmer-work 0.45s ease-in-out infinite alternate;
+}
+
+@keyframes farmer-step {
+  from {
+    transform: scaleX(var(--face, 1)) translateY(0) rotate(-3deg);
+  }
+  to {
+    transform: scaleX(var(--face, 1)) translateY(-7%) rotate(3deg);
+  }
+}
+
+@keyframes farmer-work {
+  from {
+    transform: scaleX(var(--face, 1)) rotate(0deg);
+  }
+  to {
+    transform: scaleX(var(--face, 1)) rotate(8deg) scaleY(0.94);
+  }
+}
+
+.farmer-tool {
+  position: absolute;
+  right: -30%;
+  top: 38%;
+  font-size: 22px;
+  animation: tool-use 0.45s ease-in-out infinite alternate;
+}
+
+@keyframes tool-use {
+  from {
+    transform: rotate(-20deg);
+  }
+  to {
+    transform: rotate(25deg) translateY(4px);
+  }
+}
+
+.farmer-say {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 150px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
+  animation: pop-in 0.25s ease-out;
+}
+
+/* Đứng sát mép ruộng: lời thoại canh vào trong để không tràn khỏi màn hình */
+.farmer.edge-l .farmer-say {
+  left: 0;
+  transform: none;
+}
+
+.farmer.edge-r .farmer-say {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.farm-toast {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  transform: translateX(-50%);
+  z-index: 200;
+  width: max-content;
+  max-width: 90%;
+  background: rgba(59, 42, 26, 0.88);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  text-align: center;
+  border-radius: 14px;
+  padding: 6px 12px;
+  animation: pop-in 0.25s ease-out;
+  pointer-events: none;
+}
+
+.farm-tools {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.farm-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border: 3px solid transparent;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 4px 0 #f0d3a8;
+  padding: 6px 4px;
+  font: inherit;
+  font-weight: 800;
+  font-size: 14px;
+  color: inherit;
+}
+
+.farm-tool span {
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.farm-tool.on {
+  border-color: var(--green);
+  background: #f1fbef;
+  box-shadow: 0 4px 0 #8fd283;
+}
+
+.seed-tray {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 6px;
+}
+
+.seed {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 72px;
+  border: 3px solid transparent;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 3px 0 #f0d3a8;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: inherit;
+}
+
+.seed.on {
+  border-color: var(--primary);
+}
+
+.seed:disabled {
+  opacity: 0.55;
+}
+
+.seed small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.seed-emoji {
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.farm-stock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #fff;
+  border-radius: 18px;
+  padding: 10px 12px;
+  box-shadow: 0 3px 0 #f0d3a8;
+}
+
+.farm-stock small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.farm-stock-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.farm-tag {
+  font-size: 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .farmer {
+    transition: none;
+  }
+  .farmer img,
+  .farmer-tool,
+  .tile.ripe .tile-crop {
+    animation: none;
+  }
+}
+
+/* ---------- Bày hàng lên kệ ---------- */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.stepper b {
+  min-width: 28px;
+  text-align: center;
+  font-size: 20px;
+}
+
+.step-btn {
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 12px;
+  background: var(--gold);
+  box-shadow: 0 3px 0 var(--gold-dark);
+  font: inherit;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.step-btn:disabled {
+  opacity: 0.4;
+}
+
+.action-btn.day-mini {
+  cursor: default;
+}
+
+.market-fallback {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.panel-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: #f0e2cc;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.age-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.age-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.age-btn {
+  height: 40px;
+  border: 2px solid #f0d3a8;
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.age-btn.on {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
 }
