@@ -493,9 +493,16 @@ export default function ConfigApp() {
           <Num label="Đào vàng: số giây mỗi lượt" value={t.coins.goldSeconds} onChange={set(['coins', 'goldSeconds'])} min={10} />
           <Num
             label="Lượt có thưởng mỗi ngày"
-            hint="Riêng cho Đào vàng và Luyện riêng"
+            hint="Riêng cho Đào vàng, Luyện riêng và Câu cá. Chơi quá số này vẫn được nhưng không có xu và nông trại không lớn thêm"
             value={t.coins.rewardRunsPerDay}
             onChange={set(['coins', 'rewardRunsPerDay'])}
+          />
+          <Num
+            label="Phiên chợ mỗi ngày"
+            hint="Bán đủ số phiên này thì sạp đóng đến mai: giữ mỗi ngày chơi khoảng 20–30 phút"
+            value={t.coins.shopRunsPerDay ?? 2}
+            onChange={set(['coins', 'shopRunsPerDay'])}
+            min={1}
           />
           <Num label="Rương xong 3 nhiệm vụ" value={t.coins.chest} onChange={set(['coins', 'chest'])} />
           <Num

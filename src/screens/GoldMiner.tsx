@@ -125,7 +125,7 @@ export default function GoldMiner({ profile, practice, rewardLeft, onFinish, onE
   }, [round])
 
   useEffect(() => {
-    if (rewardLeft <= 0) warn('Hôm nay hết lượt nhận xu ở Đào mỏ rồi. Vẫn chơi được để luyện tập nhưng không được cộng xu nhé!')
+    if (rewardLeft <= 0) warn('Hôm nay hết lượt nhận xu ở Đào mỏ rồi. Vẫn chơi được để luyện tập nhưng không được cộng xu, cây và gà cũng không lớn thêm nhé!')
   }, [])
 
   useEffect(() => {

@@ -51,6 +51,7 @@
     "goldPerCorrect": 3,
     "goldSeconds": 60,
     "rewardRunsPerDay": 3,
+    "shopRunsPerDay": 2,
     "checkin": [10, 15, 20, 25, 30, 40, 80],
     "chest": 30,
     "mistakeCost": 2,

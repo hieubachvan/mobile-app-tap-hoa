@@ -4,7 +4,7 @@ import { CROPS, FISHES, POND_COST, PRODUCE, canFeed, cropOf, fieldOf, isRipe, ne
 import { unitOf } from '../game/items'
 import { DAYS_PER_TIER, MAX_LEVEL, dayInLevel, levelOf, tierAt } from '../game/levels'
 import { TUNING } from '../game/tuning'
-import { claimable, ensureDaily, rewardRunsLeft } from '../game/daily'
+import { claimable, dayDone, ensureDaily, rewardRunsLeft } from '../game/daily'
 import { sfx, speak } from '../game/sound'
 import FarmMap from '../components/FarmMap'
 import { warn } from '../components/Warning'
@@ -133,6 +133,7 @@ export default function Farm({ profile, onPlant, onFeed, onHarvest, onExpand, on
       const p = farm.tiles[s.miss]
       if (!p) warn('Chọn 🌱 Gieo hạt rồi chạm vào đất trống để trồng cây nhé!')
       else if (canFeed(p, runs)) warn('Chọn ✨ Bón phân để cây mau lớn nhé!')
+      else if (dayDone(profile.daily, !!farm.pond)) warn('Cây đã được bón rồi. Mai bé quay lại bón tiếp nhé!')
       else warn('Cây đã được bón rồi. Chơi một lượt bán hàng hay đào mỏ rồi quay lại bón tiếp nhé!')
     }
   }
@@ -208,6 +209,7 @@ export default function Farm({ profile, onPlant, onFeed, onHarvest, onExpand, on
   const goldLeft = rewardRunsLeft(profile.daily, 'gold')
   const practiceLeft = rewardRunsLeft(profile.daily, 'practice')
   const fishLeft = rewardRunsLeft(profile.daily, 'fish')
+  const shopLeft = rewardRunsLeft(profile.daily, 'shop')
 
   return (
     <div className="farm-home">
@@ -253,10 +255,16 @@ export default function Farm({ profile, onPlant, onFeed, onHarvest, onExpand, on
             🧺 Kho: {stockCount(farm)}
             <small>{stocked.length ? stocked.map((c) => c.emoji).join('') : 'Trống'}</small>
           </button>
+          {dayDone(profile.daily, !!farm.pond) && (
+            <div className="hud-chip day-done">
+              🌙 Hôm nay chơi đủ rồi!
+              <small>Cây và gà lớn tiếp khi mai bé quay lại</small>
+            </div>
+          )}
         </div>
 
         <div className="map-side">
-          <MapButton main emoji="🛒" label="Bán hàng" onClick={() => play('stall')} />
+          <MapButton main emoji="🛒" label="Bán hàng" badge={shopLeft || undefined} onClick={() => play('stall')} />
           <MapButton emoji="⛏️" label="Đào mỏ" badge={goldLeft || undefined} onClick={() => play('gold')} />
           <MapButton emoji="🎯" label="Luyện" badge={practiceLeft || undefined} onClick={() => play('practice')} />
           {farm.pond ? (

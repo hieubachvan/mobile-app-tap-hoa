@@ -221,7 +221,7 @@ export default function FishPond({ profile, rewardLeft, onFinish, onSell, onExit
   }
 
   useEffect(() => {
-    if (rewardLeft <= 0) warn('Hôm nay hết lượt giữ cá rồi. Vẫn câu được để luyện tập nhưng cá sẽ được thả lại ao nhé!')
+    if (rewardLeft <= 0) warn('Hôm nay hết lượt giữ cá rồi. Vẫn câu được để luyện tập nhưng cá sẽ được thả lại ao, cây và gà cũng không lớn thêm nhé!')
   }, [])
 
   useEffect(() => {

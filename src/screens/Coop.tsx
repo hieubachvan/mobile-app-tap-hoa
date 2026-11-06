@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { callName, type Profile } from '../game/storage'
-import { today } from '../game/daily'
+import { dayDone, today } from '../game/daily'
 import { COOP, canFeedHen, coopOf, isFull, miceFor, raidPending, settleCoop } from '../game/coop'
 import { gradeOf, pickCoopQuestion, type CoopQuestion } from '../game/coopQuestions'
 import { levelOf } from '../game/levels'
@@ -258,8 +258,9 @@ export default function Coop({ profile, onFeed, onCollect, onSteal, onRaidDone, 
 
   const feed = (i: number) => {
     const h = coop.hens[i]
-    if (isFull(h)) return warn('Gà no căng rồi! Chơi một lượt bán hàng, đào mỏ hay câu cá rồi quay lại nhặt trứng nhé!')
-    if (!canFeedHen(h, profile.runs)) return warn('Gà vừa ăn xong. Chơi một lượt nữa rồi cho ăn tiếp nhé!')
+    const later = dayDone(profile.daily, !!profile.farm.pond) ? 'Mai bé quay lại' : 'Chơi một lượt bán hàng, đào mỏ hay câu cá rồi quay lại'
+    if (isFull(h)) return warn(`Gà no căng rồi! ${later} nhặt trứng nhé!`)
+    if (!canFeedHen(h, profile.runs)) return warn(`Gà vừa ăn xong. ${later} cho ăn tiếp nhé!`)
     if (profile.coins < COOP.feedCost) return warn('Hết xu mua thức ăn rồi! Bán hàng hoặc đào mỏ để kiếm thêm xu nhé!')
     sfx.coin()
     onFeed(i)

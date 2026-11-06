@@ -65,7 +65,7 @@ export default function ShopGame({ profile, shelf, practice, rewarded: rewardedP
   const [day] = useState(profile.day)
   const [rewarded] = useState(rewardedProp)
   useEffect(() => {
-    if (!rewarded) warn('Hôm nay hết lượt nhận xu ở Luyện riêng rồi. Vẫn luyện được nhưng không được cộng xu nhé!')
+    if (!rewarded) warn('Hôm nay hết lượt nhận xu ở Luyện riêng rồi. Vẫn luyện được nhưng không được cộng xu, cây và gà cũng không lớn thêm nhé!')
   }, [])
   const [tier] = useState(() => {
     const t = tierOf(profile)

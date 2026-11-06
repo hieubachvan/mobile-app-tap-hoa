@@ -38,6 +38,8 @@ export interface Tuning {
     goldSeconds: number
     /** Lượt Đào vàng / Luyện riêng được nhận xu mỗi ngày */
     rewardRunsPerDay: number
+    /** Số phiên chợ (bán hàng) mỗi ngày; hết thì sạp đóng đến mai */
+    shopRunsPerDay: number
     /** Quà điểm danh 7 ngày */
     checkin: number[]
     /** Rương khi xong cả 3 nhiệm vụ */

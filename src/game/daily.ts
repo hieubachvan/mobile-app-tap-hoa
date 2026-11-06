@@ -5,10 +5,18 @@ export const CHECKIN_REWARDS = TUNING.coins.checkin
 
 export const CHEST_REWARD = TUNING.coins.chest
 
-/** Mỗi ngày chỉ bấy nhiêu lượt Đào vàng / Luyện riêng / Câu cá được nhận thưởng; chơi thêm vẫn được nhưng không có xu */
+/**
+ * Mỗi ngày chỉ bấy nhiêu lượt Đào vàng / Luyện riêng / Câu cá được nhận thưởng.
+ * Chơi thêm vẫn được nhưng không có xu và nông trại không lớn thêm, để mỗi ngày chơi vừa đủ rồi mai quay lại.
+ */
 export const REWARD_RUNS_PER_DAY = TUNING.coins.rewardRunsPerDay
 
-export type RewardGame = 'gold' | 'practice' | 'fish'
+/** Số phiên chợ mỗi ngày: hết thì sạp đóng đến mai */
+export const SHOP_RUNS_PER_DAY = TUNING.coins.shopRunsPerDay ?? 2
+
+export type RewardGame = 'gold' | 'practice' | 'fish' | 'shop'
+
+export const runsPerDay = (game: RewardGame) => (game === 'shop' ? SHOP_RUNS_PER_DAY : REWARD_RUNS_PER_DAY)
 
 export type QuestKind = 'serve' | 'perfect' | 'gold' | 'practice' | 'stars'
 
@@ -77,8 +85,12 @@ export function newDaily(date: string): DailyState {
 }
 
 export function rewardRunsLeft(d: DailyState | undefined, game: RewardGame) {
-  return Math.max(0, REWARD_RUNS_PER_DAY - (ensureDaily(d).rewardRuns?.[game] ?? 0))
+  return Math.max(0, runsPerDay(game) - (ensureDaily(d).rewardRuns?.[game] ?? 0))
 }
+
+/** Đã dùng hết mọi lượt có thưởng hôm nay (chợ và các mini game; chưa đào ao thì không tính câu cá) */
+export const dayDone = (d: DailyState | undefined, pond: boolean) =>
+  (['shop', 'gold', 'practice', ...(pond ? (['fish'] as const) : [])] as const).every((g) => rewardRunsLeft(d, g) === 0)
 
 /** Ghi nhận đã dùng một lượt có thưởng */
 export function spendRewardRun(d: DailyState | undefined, game: RewardGame): DailyState {

@@ -87,20 +87,20 @@ export default function App() {
       ...afterDay(p, r.stars, r.counted),
       runs: p.runs + 1,
       farm: { ...p.farm, stock: addStock(p.farm.stock, r.sold, -1) },
-      daily: addProgress(p.daily, { serve: r.served, perfect: r.perfect, stars: r.stars === 3 ? 1 : 0 }),
+      daily: spendRewardRun(addProgress(p.daily, { serve: r.served, perfect: r.perfect, stars: r.stars === 3 ? 1 : 0 }), 'shop'),
     }))
 
   /** Đang luyện riêng thì quay về màn chọn phép tính, không thì về nông trại */
   const exitGame = () => play(practice ? 'practice' : 'home')
 
-  // Hết lượt thưởng thì vẫn tính nhiệm vụ và kỷ lục, chỉ không cộng xu
+  // Hết lượt thưởng thì vẫn tính nhiệm vụ và kỷ lục, nhưng không cộng xu và nông trại không lớn thêm (runs đứng yên)
   const finishPractice = (r: DayResult) =>
     update((p) => {
       const rewarded = rewardRunsLeft(p.daily, 'practice') > 0
       const daily = addProgress(p.daily, { serve: r.served, perfect: r.perfect, practice: 1 })
       return {
         coins: p.coins + (rewarded ? r.coins : 0),
-        runs: p.runs + 1,
+        runs: p.runs + (rewarded ? 1 : 0),
         daily: rewarded ? spendRewardRun(daily, 'practice') : daily,
       }
     })
@@ -112,7 +112,7 @@ export default function App() {
       return {
         coins: p.coins + (rewarded ? coins : 0),
         goldBest: Math.max(p.goldBest, correct),
-        runs: p.runs + 1,
+        runs: p.runs + (rewarded ? 1 : 0),
         daily: rewarded ? spendRewardRun(daily, 'gold') : daily,
       }
     })
@@ -122,7 +122,7 @@ export default function App() {
     update((p) => {
       const rewarded = rewardRunsLeft(p.daily, 'fish') > 0
       return {
-        runs: p.runs + 1,
+        runs: p.runs + (rewarded ? 1 : 0),
         farm: rewarded ? { ...p.farm, stock: addStock(p.farm.stock, fish) } : p.farm,
         daily: rewarded ? spendRewardRun(p.daily, 'fish') : p.daily,
       }

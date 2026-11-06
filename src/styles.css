@@ -1625,6 +1625,15 @@ button {
   color: var(--muted);
 }
 
+.hud-chip.day-done {
+  background: #2f3a6b;
+  color: #fff;
+}
+
+.hud-chip.day-done small {
+  color: #d6dcff;
+}
+
 .map-side {
   position: absolute;
   top: 8px;

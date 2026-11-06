@@ -6,6 +6,7 @@ import { unitOf } from '../game/items'
 import { CURRENCY } from '../game/questions'
 import { sfx, speak } from '../game/sound'
 import { warn } from '../components/Warning'
+import { SHOP_RUNS_PER_DAY, rewardRunsLeft } from '../game/daily'
 
 interface Props {
   profile: Profile
@@ -21,7 +22,8 @@ export default function StallSetup({ profile, onOpen, onExit }: Props) {
   // Mặc định bày hết hàng trong kho
   const [shelf, setShelf] = useState<Record<string, number>>(() => Object.fromEntries(crops.map((c) => [c.id, stock[c.id]])))
   const total = Object.values(shelf).reduce((a, b) => a + b, 0)
-  const ready = total >= MIN_SHELF
+  const sessionsLeft = rewardRunsLeft(profile.daily, 'shop')
+  const ready = total >= MIN_SHELF && sessionsLeft > 0
 
   const change = (id: string, delta: number) => {
     const next = Math.max(0, Math.min(stock[id] ?? 0, (shelf[id] ?? 0) + delta))
@@ -32,6 +34,7 @@ export default function StallSetup({ profile, onOpen, onExit }: Props) {
   }
 
   const open = () => {
+    if (!sessionsLeft) return warn(`Hôm nay bé bán đủ ${SHOP_RUNS_PER_DAY} phiên chợ rồi, chợ đóng cửa. Mai quay lại bán tiếp nhé!`)
     if (!ready) {
       const inStock = crops.reduce((a, c) => a + stock[c.id], 0)
       const tip = inStock >= MIN_SHELF ? 'Bấm dấu + để bày thêm hàng nhé!' : 'Ra ruộng thu hoạch thêm nhé!'
@@ -85,8 +88,12 @@ export default function StallSetup({ profile, onOpen, onExit }: Props) {
         <p className="practice-tip">🧺 Kho đang trống. Ra ruộng trồng cây và thu hoạch rồi quay lại bày hàng nhé!</p>
       )}
 
-      <p className={`reward-tag center ${ready ? '' : 'done'}`}>
-        {ready ? `Trên kệ có ${total} món` : `Cần bày ít nhất ${MIN_SHELF} món mới mở sạp được (đang có ${total})`}
+      <p className={`reward-tag center ${sessionsLeft ? '' : 'done'}`}>
+        {sessionsLeft ? `🛒 Hôm nay còn ${sessionsLeft}/${SHOP_RUNS_PER_DAY} phiên chợ` : '🌙 Hôm nay chợ đóng cửa rồi, mai quay lại nhé!'}
+      </p>
+
+      <p className={`reward-tag center ${total >= MIN_SHELF ? '' : 'done'}`}>
+        {total >= MIN_SHELF ? `Trên kệ có ${total} món` : `Cần bày ít nhất ${MIN_SHELF} món mới mở sạp được (đang có ${total})`}
       </p>
 
       <button className={`btn btn-primary btn-xl ${ready ? '' : 'locked'}`} onClick={open}>
